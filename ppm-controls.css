@@ -1,0 +1,406 @@
+/*
+  Scrollbars and form controls, themed.
+
+  Linked last by all 20 pages and by 404.html. ppm-picklist.js, which the pick-list section
+  styles, is loaded only by the two pages that have a multiple-select.
+
+  WHAT IS HERE
+
+    1. Scrollbars      light plum, faint until you approach them, both axes, everywhere
+    2. Text controls   input, textarea, select - one shape, one focus ring
+    3. Dropdowns       the closed box only, with a drawn chevron
+    4. Tick boxes      plum, and big enough to hit
+    5. Dates           a tinted calendar button instead of Chrome's grey one
+    6. Pick lists      the styling for ppm-picklist.js
+
+  LOAD ORDER MATTERS
+
+  Eighteen of the twenty page stylesheets define their own "input, select, textarea" block.
+  Those rules and these have the same specificity, so the last stylesheet linked wins. This
+  file must therefore be linked AFTER the page stylesheet:
+
+      <link rel="stylesheet" href="index-page.css?v=...">
+      <link rel="stylesheet" href="ppm-controls.css?v=...">     <- last
+
+  Nothing here uses !important. Where a page genuinely needs a different shape - the plan
+  grid's dense cells, for instance - its more specific selector still wins, which is the
+  behaviour we want.
+
+  WHY NOT STYLE THE OPEN DROPDOWN
+
+  Because Chrome does not allow it. The list a <select> opens is drawn by the operating
+  system; no stylesheet reaches inside it. The only way to theme it is to stop using <select>
+  and build a menu in JavaScript, which for the 184 dropdowns in this application would mean
+  re-implementing keyboard use, typeahead and screen-reader behaviour by hand. So the box is
+  themed, the list it opens is Chrome's, and that is a deliberate stopping point rather than
+  an oversight.
+
+  COLOURS
+
+  Plum #5b294f is the brand colour, used at low alpha for scrollbars and focus rings so the
+  chrome recedes and the content does not. Deep plum #3f1937 is for text on plum.
+*/
+
+/* ==================================================== 1. scrollbars */
+
+/*
+  Two things have to be said twice, because there are two mechanisms:
+
+    - ::-webkit-scrollbar   Chrome and Edge. Fine-grained, and what this application runs on.
+    - scrollbar-color       the standard property, honoured by Firefox. Thumb and track only.
+
+  The alpha steps are the whole effect: a scrollbar you can find when you want it and stop
+  noticing when you do not. Approaching the container brings it up before the pointer has
+  arrived, which is what makes it feel responsive rather than sticky.
+*/
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(91, 41, 79, 0.34) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+  The transparent border plus background-clip is what insets the thumb from the edge of the
+  track. Padding does nothing on a scrollbar thumb; a border that the background does not
+  paint into does, and it keeps the rounded ends from touching the frame.
+*/
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: rgba(91, 41, 79, 0.26);
+  background-clip: padding-box;
+}
+
+/* Anywhere the pointer is inside the scrolling area. */
+*:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(91, 41, 79, 0.44);
+}
+
+/* On the bar itself. */
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(91, 41, 79, 0.68);
+}
+
+/* While dragging. */
+::-webkit-scrollbar-thumb:active {
+  background-color: rgba(91, 41, 79, 0.82);
+}
+
+/* Where a horizontal and a vertical bar meet, Chrome fills a square. Left grey, it reads as
+   a missing tile in the corner of every scrolling table. */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ================================================ 2. text controls */
+
+input,
+select,
+textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #172033;
+  font: inherit;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: #a9899f;
+}
+
+/*
+  One focus treatment for everything: the border goes plum and a soft plum halo appears
+  outside it. Chrome's own focus ring is replaced rather than removed - a focus style you
+  cannot see is an accessibility defect, not a clean design.
+*/
+input:focus,
+input:focus-visible,
+select:focus,
+select:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  border-color: #5b294f;
+  outline: 3px solid rgba(91, 41, 79, 0.18);
+  outline-offset: 0;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  border-color: #e2e8f0;
+  background-color: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+textarea {
+  resize: vertical;
+}
+
+/* Invalid is stated, not implied by colour alone - the browser still reports it, and the
+   forms carry their own messages. This only makes the box agree with the message. */
+input:not(:placeholder-shown):invalid,
+textarea:not(:placeholder-shown):invalid {
+  border-color: #dc2626;
+}
+
+/* ==================================================== 3. dropdowns */
+
+/*
+  appearance:none takes away the operating system arrow, so one has to be drawn back on. It
+  is a data: URI rather than a separate file for one reason: a background-image is governed
+  by img-src, which this application's policy sets to 'self' data: blob:, so this is allowed
+  where an injected <style> or a style attribute would not be.
+
+  Excluded: [multiple] and any select with a size, both of which render as a list box with no
+  arrow to replace. Applying the padding to those would indent every row for nothing.
+*/
+select:not([multiple]):not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%235b294f' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 11px 7px;
+}
+
+select:not([multiple]):not([size]):disabled {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%2394a3b8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* A list-box select keeps its scroll, and gets the same inner spacing as the pick list so
+   the two do not look like different components. */
+select[multiple],
+select[size] {
+  padding: 4px;
+}
+
+select[multiple] option,
+select[size] option {
+  padding: 5px 7px;
+  border-radius: 5px;
+}
+
+/* ==================================================== 4. tick boxes */
+
+/*
+  accent-color themes the tick and the fill in one property, and keeps the native control -
+  which means keyboard, indeterminate state and forced-colours mode all keep working. The
+  usual alternative, hiding the input and drawing a box, throws all three away.
+
+  The explicit size is here because most page stylesheets set "input { width: 100% }" for
+  text fields, which stretches a tick box across its row.
+*/
+input[type="checkbox"],
+input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  accent-color: #5b294f;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  cursor: not-allowed;
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+/* ======================================================== 5. dates */
+
+/*
+  Chrome's calendar button is a grey glyph that ignores the page. Tinting it plum and lifting
+  it on hover makes it look chosen rather than inherited. The picker it opens is the
+  operating system's, like the dropdown list, and equally out of reach.
+*/
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  filter: invert(18%) sepia(24%) saturate(1600%) hue-rotate(272deg) brightness(88%) contrast(94%);
+}
+
+input[type="date"]:hover::-webkit-calendar-picker-indicator,
+input[type="month"]:hover::-webkit-calendar-picker-indicator,
+input[type="time"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  background-color: #faf5ff;
+}
+
+/* Chrome's number spinners are two tiny arrows that are hard to hit and easy to hit by
+   accident. Left in place, because removing them removes a way to use the field. */
+input[type="number"] {
+  padding-right: 4px;
+}
+
+/* ==================================================== 6. pick lists */
+
+/*
+  The markup these style is built by ppm-picklist.js from the <select multiple> it replaces.
+  That select stays in the DOM, hidden, and remains the thing the page reads and writes - so
+  every existing .selectedOptions read keeps working and the permission model still applies
+  to the real control. See the header of ppm-picklist.js.
+*/
+
+.ppm-picklist-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ppm-picklist {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+/* Focus is drawn on the wrapper, not on each row, so tabbing into the list looks like
+   arriving at one control rather than at the first of nine. */
+.ppm-picklist:focus-within {
+  border-color: #5b294f;
+  box-shadow: 0 0 0 3px rgba(91, 41, 79, 0.18);
+}
+
+.ppm-picklist-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-bottom: 1px solid #eef2f7;
+  background-color: #fbfcfe;
+}
+
+.ppm-picklist-count {
+  margin-right: auto;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ppm-picklist-count.some {
+  color: #5b294f;
+}
+
+.ppm-picklist-action {
+  padding: 3px 9px;
+  border: 1px solid #dbe3ef;
+  border-radius: 999px;
+  background-color: #fff;
+  color: #5b294f;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ppm-picklist-action:hover:not(:disabled) {
+  border-color: #5b294f;
+  background-color: #faf5ff;
+}
+
+.ppm-picklist-action:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.ppm-picklist-list {
+  max-height: 190px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.ppm-picklist-list li {
+  margin: 0;
+}
+
+/*
+  The whole row is the label, so anywhere in it toggles the item. A tick box you must hit
+  exactly is the complaint that started this.
+*/
+.ppm-picklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  color: #172033;
+  font-size: 12px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.ppm-picklist-item:hover {
+  background-color: #f8fafc;
+}
+
+/* Selected is said three ways - tick, plum text, plum tint - because highlight alone was
+   the problem being fixed, and colour alone is not enough on its own. */
+.ppm-picklist-item.selected {
+  background-color: #faf5ff;
+  color: #3f1937;
+  font-weight: 700;
+}
+
+.ppm-picklist-item.selected:hover {
+  background-color: #f5ecfa;
+}
+
+.ppm-picklist-box {
+  margin: 1px 0 0;
+  flex: 0 0 auto;
+}
+
+.ppm-picklist-text {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.ppm-picklist-item.disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.ppm-picklist-item.disabled:hover {
+  background-color: transparent;
+}
+
+.ppm-picklist-empty {
+  padding: 14px 10px;
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}
