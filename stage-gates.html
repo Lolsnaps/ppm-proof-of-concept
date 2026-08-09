@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Stage Gates | Foresters Portfolio</title>
+  <link rel="stylesheet" href="stage-gates-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Project, programme and portfolio management</p>
+    </header>
+    <nav>
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="stage-gates.html" class="active">Stage Gates</a
+      ><a href="raid-log.html">RAID Log</a><a href="registers.html">Registers</a
+      ><a href="benefits-management.html">Benefits</a><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div class="page-heading">
+        <div>
+          <h2>Stage gates</h2>
+          <p>
+            Submit lifecycle progression for formal review, retain each approver’s decision and conditions,
+            and apply the approved project stage automatically. Governance-route exceptions remain visible and
+            require separate approval.
+          </p>
+        </div>
+        <div class="heading-actions">
+          <button
+            id="saveChangesButton"
+            class="button"
+            type="button"
+            data-permission="stageGates.submit"
+            disabled
+          >
+            Saved</button
+          ><button id="addGateButton" class="button light" type="button" data-permission="stageGates.submit">
+            Add stage gate
+          </button>
+        </div>
+      </div>
+
+      <section class="summary-grid" aria-label="Stage-gate summary">
+        <div class="summary-card">
+          <div class="summary-label">Visible stage gates</div>
+          <div id="totalGates" class="summary-value">0</div>
+        </div>
+        <div class="summary-card attention">
+          <div class="summary-label">Awaiting my approval</div>
+          <div id="myApprovals" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Submitted for decision</div>
+          <div id="submittedGates" class="summary-value">0</div>
+        </div>
+        <div class="summary-card good">
+          <div class="summary-label">Approved progression</div>
+          <div id="approvedGates" class="summary-value">0</div>
+        </div>
+        <div class="summary-card attention">
+          <div class="summary-label">Decision date passed</div>
+          <div id="overdueGates" class="summary-value">0</div>
+        </div>
+      </section>
+
+      <section class="guidance" aria-label="How stage-gate governance works">
+        <div>
+          <h3>Controlled lifecycle progression</h3>
+          <p>
+            A project moves stage only when every named approver records final approval. Conditional approval,
+            deferral and rejection leave the current project stage unchanged.
+          </p>
+        </div>
+        <div>
+          <h3>Submitter</h3>
+          <p>
+            <strong>Prepares the evidence.</strong> Complete the gate record, select required approvers and
+            submit it for decision.
+          </p>
+        </div>
+        <div>
+          <h3>Approvers</h3>
+          <p>
+            <strong>Make the decision.</strong> Only named approvers can decide, and a submission owner or
+            submitter cannot approve their own gate.
+          </p>
+        </div>
+        <div>
+          <h3>Not applicable</h3>
+          <p>
+            <strong>Retain the exception.</strong> Supply a reason and an independent route approver; approval
+            closes the gate without changing project stage.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Stage-gate register</h3>
+            <p>
+              Edit Draft, Deferred and Rejected records directly. Open Gate details for evidence, approvers,
+              actions, decisions and workflow history.
+            </p>
+          </div>
+          <span id="unsavedIndicator" class="unsaved">All changes saved</span>
+        </div>
+        <div class="filters">
+          <input
+            id="gateSearch"
+            type="search"
+            placeholder="Search gate, project, owner or approver"
+            aria-label="Search stage gates"
+          />
+          <select id="projectFilter" aria-label="Filter by project">
+            <option value="">All projects</option>
+          </select>
+          <select id="statusFilter" aria-label="Filter by status">
+            <option value="">All workflow statuses</option>
+          </select>
+          <select id="routeFilter" aria-label="Filter by route requirement">
+            <option value="">All route requirements</option>
+            <option>Required</option>
+            <option>Optional</option>
+            <option>Not Applicable</option>
+          </select>
+        </div>
+        <div class="table-wrapper">
+          <table class="gate-table">
+            <thead>
+              <tr>
+                <th class="gate-id-cell">Gate ID</th>
+                <th class="mw-205">Project</th>
+                <th class="mw-205">Gate name</th>
+                <th class="mw-145">Governance route</th>
+                <th class="mw-175">Current stage</th>
+                <th class="mw-185">Proposed next stage</th>
+                <th class="mw-210">Submission owner</th>
+                <th class="mw-225">Required approvers</th>
+                <th class="mw-145">Submission date</th>
+                <th class="mw-145">Meeting date</th>
+                <th class="mw-185">Workflow</th>
+                <th class="actions-cell">Row actions</th>
+              </tr>
+            </thead>
+            <tbody id="gateBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state">No stage gates match the selected view.</div>
+      </section>
+    </main>
+
+    <div
+      id="detailModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="detailTitle"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="detailTitle">Stage-gate details</h2>
+            <p id="detailSubtitle"></p>
+          </div>
+          <button id="closeDetailButton" class="modal-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <section class="modal-section">
+            <h3>Submission and evidence</h3>
+            <div class="form-grid">
+              <div class="form-field full">
+                <label for="detailSubmissionComments">Submission comments and recommendation</label
+                ><textarea
+                  id="detailSubmissionComments"
+                  placeholder="Summarise readiness, evidence and the recommendation to approvers"
+                ></textarea>
+              </div>
+              <div class="form-field full">
+                <label>Required approvers <span class="required">*</span></label>
+                <div id="approverChecks" class="checkbox-grid"></div>
+                <span class="help"
+                  >Every selected approver must give final approval before the project changes stage.</span
+                >
+              </div>
+              <div class="form-field">
+                <label for="detailDecisionDate">Decision date</label
+                ><input id="detailDecisionDate" type="date" />
+              </div>
+              <div class="form-field">
+                <label for="detailMeetingDate">Meeting date</label
+                ><input id="detailMeetingDate" type="date" />
+              </div>
+              <div class="form-field two">
+                <label for="detailDocuments">Supporting documents</label
+                ><textarea
+                  id="detailDocuments"
+                  placeholder="One per line: Document title | https://repository/link"
+                ></textarea
+                ><span class="help"
+                  >Links are retained as governance evidence; repository access is not checked by this browser
+                  prototype.</span
+                >
+              </div>
+            </div>
+          </section>
+
+          <section class="modal-section">
+            <h3>Governance route</h3>
+            <div class="form-grid">
+              <div class="form-field two">
+                <label for="detailRouteReason">Not-applicable or route-exception reason</label
+                ><textarea
+                  id="detailRouteReason"
+                  placeholder="Explain why the standard gate does not apply"
+                ></textarea>
+              </div>
+              <div class="form-field">
+                <label for="detailRouteApprover">Route approver</label
+                ><select id="detailRouteApprover"></select>
+              </div>
+              <div class="form-field">
+                <label>Route approval</label>
+                <div id="detailRouteStatus"></div>
+                <span id="routeApprovalMeta" class="help"></span>
+              </div>
+              <div class="form-field full">
+                <label for="detailRouteComments">Route approval comments</label
+                ><textarea id="detailRouteComments" readonly></textarea>
+              </div>
+            </div>
+          </section>
+
+          <section class="modal-section">
+            <h3>Outcome, linked actions and decision</h3>
+            <div class="form-grid">
+              <div class="form-field two">
+                <label for="detailApprovalComments">Approval comments</label
+                ><textarea id="detailApprovalComments" readonly></textarea>
+              </div>
+              <div class="form-field two">
+                <label for="detailConditions">Approval conditions</label
+                ><textarea id="detailConditions" readonly></textarea>
+              </div>
+              <div class="form-field two">
+                <label for="detailOutcomeReason">Rejection, deferral or cancellation reason</label
+                ><textarea id="detailOutcomeReason" readonly></textarea>
+              </div>
+              <div class="form-field two">
+                <label for="detailDecisionSummary">Decision summary</label
+                ><textarea
+                  id="detailDecisionSummary"
+                  placeholder="Summary that will be retained in the linked Decision Register"
+                ></textarea>
+              </div>
+              <div class="form-field two">
+                <label for="detailActions">Actions arising</label
+                ><textarea id="detailActions" placeholder="One action per line"></textarea>
+              </div>
+              <div class="form-field">
+                <label for="detailActionOwner">Default action owner</label
+                ><select id="detailActionOwner"></select>
+              </div>
+              <div class="form-field">
+                <label for="detailActionDueDate">Default due date</label
+                ><input id="detailActionDueDate" type="date" />
+              </div>
+              <div class="form-field full">
+                <label>Linked register records</label>
+                <div id="linkedRecords" class="help"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="modal-section">
+            <h3>Approval history</h3>
+            <div id="approvalHistory" class="history-list"></div>
+          </section>
+
+          <section class="workflow-panel">
+            <p id="workflowGuidance"></p>
+            <div id="workflowActions" class="workflow-actions"></div>
+          </section>
+        </div>
+        <div class="modal-footer">
+          <span id="detailReadOnlyNote" class="unsaved"></span>
+          <div class="button-row">
+            <button id="cancelDetailButton" type="button" class="button light">Close</button
+            ><button id="applyDetailButton" type="button" class="button" data-permission="stageGates.submit">
+              Apply details
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="workflowDialog"
+      class="dialog-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="workflowDialogTitle"
+    >
+      <div class="dialog">
+        <h2 id="workflowDialogTitle">Confirm workflow action</h2>
+        <p id="workflowDialogText"></p>
+        <div class="dialog-fields">
+          <div id="workflowCommentsField">
+            <label for="workflowComments">Comments</label><textarea id="workflowComments"></textarea>
+          </div>
+          <div id="workflowConditionsField">
+            <label for="workflowConditions">Conditions <span class="required">*</span></label
+            ><textarea id="workflowConditions"></textarea>
+          </div>
+          <div id="workflowReasonField">
+            <label for="workflowReason">Reason <span class="required">*</span></label
+            ><textarea id="workflowReason"></textarea>
+          </div>
+          <div>
+            <label for="workflowDecisionDate">Decision date</label
+            ><input id="workflowDecisionDate" type="date" />
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button id="cancelWorkflowButton" type="button" class="button light">Go back</button
+          ><button id="confirmWorkflowButton" type="button" class="button">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="deleteDialog"
+      class="dialog-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteTitle"
+    >
+      <div class="dialog">
+        <h2 id="deleteTitle">Delete stage gate?</h2>
+        <p id="deleteText"></p>
+        <div class="dialog-actions">
+          <button id="cancelDeleteButton" type="button" class="button light" data-permission="none">Keep stage gate</button
+          ><button id="confirmDeleteButton" type="button" class="button danger" data-permission="stageGates.submit">Delete stage gate</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|ppm-governance-utils.js?v=2026.08.09.11|ppm-stage-gate-utils.js?v=2026.08.09.11|stage-gates-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+    
+  </body>
+</html>

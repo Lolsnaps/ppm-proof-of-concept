@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Project Plan | PPM Tool</title>
+  <link rel="stylesheet" href="project-plan-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+    <nav>
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a id="milestonesNav" href="milestones.html">Milestones</a
+      ><a id="raidLogNav" href="raid-log.html">RAID Log</a><a href="registers.html">Registers</a
+      ><a href="benefits-management.html">Benefits</a><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a id="financialNav" href="financial-management.html">Financials</a
+      ><a id="auditNav" href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div class="page-heading">
+        <div>
+          <h2 id="projectName">Project plan</h2>
+          <p id="projectDescription">
+            Maintain tasks, hierarchy, dependencies, baselines and delivery dates.
+          </p>
+        </div>
+        <div class="heading-actions">
+          <a id="detailsButton" href="index.html" class="button light">Project details</a
+          ><button id="savePlanButton" class="button" type="button" disabled data-permission="plan.edit">Saved</button
+          ><button id="addTaskButton" class="button" type="button" data-permission="plan.edit">Add plan row</button>
+        </div>
+      </div>
+
+      <section class="governance-card">
+        <div class="governance-heading">
+          <div>
+            <h3>Baseline governance</h3>
+            <p>
+              Approved baseline dates are locked. Rebaseline requests retain the existing and proposed
+              schedules for comparison.
+            </p>
+          </div>
+          <div class="button-row">
+            <button id="approveBaselineButton" type="button" class="button" data-permission="plan.approveBaseline">Approve initial baseline</button
+            ><button id="requestRebaselineButton" type="button" class="button light" disabled data-permission="plan.requestBaseline">
+              Request rebaseline</button
+            ><button id="baselineHistoryButton" type="button" class="button light" data-permission="none">Baseline history</button>
+          </div>
+        </div>
+        <div class="governance-meta">
+          <span id="baselineStatusBadge" class="badge amber">No approved baseline</span
+          ><span id="baselineVersionBadge" class="badge">Version 0</span
+          ><span id="baselineApprovalMeta" class="badge">Approval required</span>
+        </div>
+      </section>
+
+      <section class="summary-grid" aria-label="Plan summary">
+        <div class="summary-card">
+          <div class="summary-label">Plan items</div>
+          <div id="totalTasks" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Milestones</div>
+          <div id="milestoneCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Critical path</div>
+          <div id="criticalCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Slipped</div>
+          <div id="slippedCount" class="summary-value danger">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Dependency conflicts</div>
+          <div id="conflictCount" class="summary-value warning">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Estimated effort</div>
+          <div id="effortTotal" class="summary-value">0h</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Remaining effort</div>
+          <div id="remainingTotal" class="summary-value">0h</div>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Plan filters">
+        <input
+          id="taskSearch"
+          type="search"
+          placeholder="Search task, deliverable, owner or notes"
+          aria-label="Search plan"
+        /><select id="phaseFilter">
+          <option value="">All phases</option></select
+        ><select id="typeFilter">
+          <option value="">All item types</option></select
+        ><select id="statusFilter">
+          <option value="">All statuses</option></select
+        ><select id="ownerFilter">
+          <option value="">All owners</option></select
+        ><select id="planView">
+          <option value="full">Full plan</option>
+          <option value="milestones">Milestone-only view</option>
+          <option value="critical">Critical path</option>
+          <option value="comparison">Baseline vs forecast</option>
+        </select>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Project plan</h3>
+            <p>
+              Edit cells directly. Every field is labelled within its column; scroll horizontally to work
+              across the full plan.
+            </p>
+          </div>
+          <span id="unsavedIndicator" class="unsaved">All changes saved</span>
+        </div>
+        <div class="table-wrapper">
+          <table class="plan-table">
+            <colgroup>
+              <col class="w-340" />
+              <col class="w-230" />
+              <col class="w-260" />
+              <col class="w-260" />
+              <col class="w-280" />
+              <col class="w-130" />
+              <col class="w-180" />
+              <col class="w-280" />
+              <col class="w-280" />
+              <col class="w-280" />
+              <col class="w-190" />
+              <col class="w-200" />
+              <col class="w-170" />
+              <col class="w-150" />
+              <col class="w-580" />
+              <col class="w-300" />
+              <col class="w-110" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th class="sticky-task">
+                  <span class="column-title">Plan item</span
+                  ><span class="column-help">Item type, task name and mandatory flag</span>
+                </th>
+                <th>
+                  <span class="column-title">Parent item</span
+                  ><span class="column-help">Position in the plan hierarchy</span>
+                </th>
+                <th>
+                  <span class="column-title">Phase and deliverable</span
+                  ><span class="column-help">Delivery phase and output</span>
+                </th>
+                <th>
+                  <span class="column-title">Task owner</span
+                  ><span class="column-help">Person accountable for delivery</span>
+                </th>
+                <th>
+                  <span class="column-title">Supporting contributors</span
+                  ><span class="column-help">Additional people assigned</span>
+                </th>
+                <th><span class="column-title">Priority</span></th>
+                <th>
+                  <span class="column-title">Duration and allocation</span
+                  ><span class="column-help">Working days and owner allocation</span>
+                </th>
+                <th>
+                  <span class="column-title">Approved baseline</span
+                  ><span class="column-help">Baseline start and finish</span>
+                </th>
+                <th>
+                  <span class="column-title">Forecast dates</span
+                  ><span class="column-help">Forecast start and calculated finish</span>
+                </th>
+                <th>
+                  <span class="column-title">Actual dates</span
+                  ><span class="column-help">Actual start and finish</span>
+                </th>
+                <th>
+                  <span class="column-title">Effort</span
+                  ><span class="column-help">Estimated and remaining hours</span>
+                </th>
+                <th>
+                  <span class="column-title">Status and progress</span
+                  ><span class="column-help">Delivery status and percentage complete</span>
+                </th>
+                <th>
+                  <span class="column-title">Dependencies</span
+                  ><span class="column-help">Internal and external links</span>
+                </th>
+                <th><span class="column-title">Critical path</span></th>
+                <th>
+                  <span class="column-title">Slippage response</span
+                  ><span class="column-help">Impact, reason and recovery action</span>
+                </th>
+                <th>
+                  <span class="column-title">Notes</span
+                  ><span class="column-help">Additional delivery commentary</span>
+                </th>
+                <th><span class="column-title">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="taskTableBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyMessage" class="empty-message">No plan items match the selected view.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Project timeline</h3>
+            <p>
+              Approved baseline, forecast and actual dates with critical-path highlighting and dependency
+              links.
+            </p>
+          </div>
+          <select class="w-auto" id="timelineZoom">
+            <option>Week</option>
+            <option selected>Month</option>
+            <option>Quarter</option>
+            <option>Year</option>
+          </select>
+        </div>
+        <div id="timelineContainer" class="timeline-scroll"></div>
+      </section>
+    </main>
+
+    <div
+      id="dependencyModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dependencyModalTitle"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="dependencyModalTitle">Dependencies</h2>
+            <p>Add internal or cross-project links using FS, SS, FF or SF relationships.</p>
+          </div>
+          <button id="closeDependencyModal" type="button" class="modal-close" aria-label="Close">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="dependencyRows"></div>
+          <button id="addDependencyButton" type="button" class="button light" data-permission="plan.edit">Add dependency</button>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelDependencyButton" type="button" class="button light">Cancel</button
+          ><button id="saveDependenciesButton" type="button" class="button" data-permission="plan.edit">Apply dependencies</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="baselineDecisionModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="baselineDecisionTitle"
+    >
+      <div class="modal small">
+        <div class="modal-header">
+          <div>
+            <h2 id="baselineDecisionTitle">Approve baseline</h2>
+            <p id="baselineDecisionDescription">
+              Record the approval before baseline dates become read-only.
+            </p>
+          </div>
+          <button id="closeBaselineDecision" type="button" class="modal-close" aria-label="Close" data-permission="none">
+            &times;
+          </button>
+        </div>
+        <form id="baselineDecisionForm">
+          <input id="baselineDecisionAction" type="hidden" /><input id="baselineRequestId" type="hidden" />
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-field two">
+                <label for="baselineApprover">Approver *</label
+                ><select id="baselineApprover" required></select>
+              </div>
+              <div class="form-field">
+                <label for="baselineApprovalDate">Approval date *</label
+                ><input id="baselineApprovalDate" type="date" required />
+              </div>
+              <div class="form-field full">
+                <label for="baselineDecisionReason">Reason / decision notes *</label
+                ><textarea id="baselineDecisionReason" required></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelBaselineDecision" type="button" class="button light" data-permission="none">Cancel</button
+            ><button id="submitBaselineDecision" type="submit" class="button" data-permission="plan.approveBaseline">Approve</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="rebaselineModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rebaselineTitle"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="rebaselineTitle">Request rebaseline</h2>
+            <p>Propose replacement dates without overwriting the approved baseline.</p>
+          </div>
+          <button id="closeRebaseline" type="button" class="modal-close" aria-label="Close" data-permission="none">&times;</button>
+        </div>
+        <form id="rebaselineForm">
+          <div class="modal-body">
+            <div class="form-grid mb-16">
+              <div class="form-field two">
+                <label for="rebaselineRequestor">Requested by *</label
+                ><select id="rebaselineRequestor" required></select>
+              </div>
+              <div class="form-field full">
+                <label for="rebaselineReason">Reason *</label
+                ><textarea id="rebaselineReason" required></textarea>
+              </div>
+              <div class="form-field full">
+                <label for="rebaselineImpact">Impact *</label
+                ><textarea
+                  id="rebaselineImpact"
+                  required
+                  placeholder="Describe delivery, financial, benefit, resource or dependency impacts"
+                ></textarea>
+              </div>
+            </div>
+            <div class="table-wrapper">
+              <table class="rebaseline-table">
+                <thead>
+                  <tr>
+                    <th>Plan item</th>
+                    <th>Existing start</th>
+                    <th>Existing finish</th>
+                    <th>Proposed start</th>
+                    <th>Proposed finish</th>
+                  </tr>
+                </thead>
+                <tbody id="rebaselineRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelRebaseline" type="button" class="button light" data-permission="none">Cancel</button
+            ><button type="submit" class="button" data-permission="plan.requestBaseline">Submit request</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="baselineHistoryModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="baselineHistoryTitle"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="baselineHistoryTitle">Baseline history</h2>
+            <p>Approved versions and rebaseline decisions remain available for comparison.</p>
+          </div>
+          <button id="closeBaselineHistory" type="button" class="modal-close" aria-label="Close" data-permission="none">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <h3>Approved versions</h3>
+          <div id="baselineVersions"></div>
+          <h3 class="mt-24">Rebaseline requests</h3>
+          <div id="baselineRequests"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="doneBaselineHistory" type="button" class="button" data-permission="none">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="deleteConfirmation"
+      class="confirmation-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteTitle"
+    >
+      <div class="confirmation-bubble">
+        <h2 id="deleteTitle">Delete plan item?</h2>
+        <p id="deleteMessage"></p>
+        <div class="confirmation-actions">
+          <button id="cancelDelete" type="button" class="button light" data-permission="none">Keep item</button
+          ><button id="confirmDelete" type="button" class="button danger" data-permission="plan.edit">Delete item</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|ppm-governance-utils.js?v=2026.08.09.11|ppm-planning-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|project-plan-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+    
+  </body>
+</html>

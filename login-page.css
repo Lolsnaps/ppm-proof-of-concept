@@ -1,0 +1,345 @@
+* {
+  box-sizing: border-box;
+}
+:root {
+  --plum: #5b294f;
+  --plum-dark: #3f1937;
+  --blue: #9ddcf9;
+  --blue-hover: #78c7e9;
+  --line: #dbe3ef;
+  --muted: #64748b;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f7f3f6 0%, #eef8fd 54%, #f4f7fb 100%);
+  color: #172033;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.shell {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.88fr) minmax(520px, 1.12fr);
+  min-height: 100vh;
+}
+.brand-panel {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(38px, 6vw, 86px);
+  background: var(--plum);
+  color: #fff;
+}
+.brand-panel:before,
+.brand-panel:after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(157, 220, 249, 0.13);
+}
+.brand-panel:before {
+  width: 460px;
+  height: 460px;
+  right: -250px;
+  top: -150px;
+}
+.brand-panel:after {
+  width: 320px;
+  height: 320px;
+  left: -190px;
+  bottom: -120px;
+}
+.brand,
+.brand-copy,
+.prototype-note {
+  position: relative;
+  z-index: 1;
+}
+.brand {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+}
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+}
+.brand-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--blue);
+  color: var(--plum-dark);
+  font-size: 20px;
+}
+.brand-copy {
+  max-width: 630px;
+  margin: 50px 0;
+}
+.brand-copy h1 {
+  margin: 0;
+  font-size: clamp(38px, 4.2vw, 68px);
+  line-height: 1.02;
+}
+.brand-copy p {
+  max-width: 560px;
+  margin: 24px 0 0;
+  color: #eadde7;
+  font-size: 17px;
+  line-height: 1.6;
+}
+.benefits {
+  display: grid;
+  gap: 13px;
+  margin-top: 34px;
+}
+.benefit {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  color: #f5edf3;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.tick {
+  display: grid;
+  flex: 0 0 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(157, 220, 249, 0.2);
+  color: var(--blue);
+  font-weight: 900;
+}
+.prototype-note {
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #eadde7;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.form-panel {
+  display: grid;
+  place-items: center;
+  padding: 40px;
+}
+.card {
+  width: min(520px, 100%);
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-top: 7px solid var(--plum);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 22px 60px rgba(63, 25, 55, 0.13);
+}
+.card h2 {
+  margin: 0;
+  font-size: 28px;
+}
+.card > .intro {
+  margin: 9px 0 25px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.message {
+  display: none;
+  margin: 0 0 17px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.message.visible {
+  display: block;
+}
+.message.error {
+  border: 1px solid #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+.message.success {
+  border: 1px solid #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+.message.info {
+  border: 1px solid #bae6fd;
+  background: #f0f9ff;
+  color: #075985;
+}
+form {
+  display: grid;
+  gap: 16px;
+}
+.field label {
+  display: block;
+  margin-bottom: 7px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+.field input,
+.field select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  font-size: 14px;
+}
+.field input:focus,
+.field select:focus {
+  border-color: #63bde7;
+  outline: 3px solid rgba(99, 189, 231, 0.2);
+}
+.field small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.password-wrap {
+  position: relative;
+}
+.password-wrap input {
+  padding-right: 76px;
+}
+.show-password {
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.button {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--blue);
+  color: var(--plum-dark);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.button:hover {
+  background: var(--blue-hover);
+}
+.button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.button.secondary {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+.button-row {
+  display: flex;
+  gap: 9px;
+}
+.button-row .button {
+  flex: 1;
+}
+.support {
+  margin: 18px 0 0;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.setup-banner {
+  margin-bottom: 20px;
+  padding: 13px 15px;
+  border-left: 5px solid var(--plum);
+  border-radius: 7px;
+  background: #faf5f9;
+  color: #5b294f;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+.hidden {
+  display: none !important;
+}
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .brand-panel {
+    min-height: 330px;
+    padding: 34px;
+  }
+  .brand-copy {
+    margin: 45px 0 25px;
+  }
+  .brand-copy h1 {
+    font-size: 42px;
+  }
+  .benefits,
+  .prototype-note {
+    display: none;
+  }
+  .form-panel {
+    padding: 25px 18px 45px;
+  }
+  .card {
+    padding: 26px;
+  }
+}
+
+/* Stage 13A: first-run authenticator enrolment. */
+.enrol-qr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 188px;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid #d8dbe0;
+  border-radius: 10px;
+  background: #fff;
+  text-align: center;
+  font-size: 12px;
+  color: #5c6470;
+}
+.enrol-qr img,
+.enrol-qr svg {
+  width: 176px;
+  height: 176px;
+  display: block;
+}
+.enrol-secret {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #f2f3f5;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  word-break: break-all;
+  user-select: all;
+}

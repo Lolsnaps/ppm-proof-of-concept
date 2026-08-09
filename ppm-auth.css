@@ -1,0 +1,540 @@
+:root {
+  --ppm-auth-plum: #5b294f;
+  --ppm-auth-plum-dark: #3f1937;
+  --ppm-auth-blue: #9ddcf9;
+  --ppm-auth-blue-hover: #78c7e9;
+}
+
+html.ppm-auth-pending body:not(.ppm-public-page) {
+  visibility: hidden;
+}
+
+header.ppm-auth-header {
+  position: relative;
+  padding-right: clamp(260px, 25vw, 390px) !important;
+}
+
+.ppm-session-bar {
+  position: absolute;
+  top: 50%;
+  right: var(--page-gutter, var(--gutter, clamp(22px, 2.6vw, 56px)));
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  transform: translateY(-50%);
+}
+
+.ppm-session-identity {
+  min-width: 0;
+  text-align: right;
+}
+
+.ppm-session-name,
+.ppm-session-role {
+  display: block;
+  overflow: hidden;
+  max-width: 245px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ppm-session-name {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ppm-session-role {
+  margin-top: 3px;
+  color: #eadde7;
+  font-size: 10px;
+}
+
+.ppm-session-button {
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ppm-session-button:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.ppm-permission-toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 4000;
+  width: min(420px, calc(100vw - 44px));
+  padding: 14px 16px;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.ppm-read-only-note,
+.ppm-scope-note {
+  margin: 0 0 18px;
+  padding: 12px 15px;
+  border: 1px solid #cbd5e1;
+  border-left: 5px solid var(--ppm-auth-plum);
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.ppm-access-denied {
+  display: grid;
+  min-height: 55vh;
+  place-items: center;
+  padding: 30px;
+}
+
+.ppm-access-denied-card {
+  width: min(620px, 100%);
+  padding: 34px;
+  border: 1px solid #dbe3ef;
+  border-top: 7px solid var(--ppm-auth-plum);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.1);
+  text-align: center;
+}
+
+.ppm-access-denied-card h2 {
+  margin: 0 0 10px;
+  color: #172033;
+  font-size: 28px;
+}
+
+.ppm-access-denied-card p {
+  margin: 0 auto 22px;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.ppm-access-denied-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ppm-auth-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--ppm-auth-blue);
+  color: var(--ppm-auth-plum-dark);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ppm-auth-action:hover {
+  background: var(--ppm-auth-blue-hover);
+}
+
+.ppm-auth-action.secondary {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+
+.ppm-finance-rag-only {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.ppm-finance-rag-card {
+  padding: 18px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ppm-finance-rag-card h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.ppm-finance-rag-badge {
+  display: inline-flex;
+  min-width: 110px;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 7px;
+  background: #e2e8f0;
+  color: #334155;
+  font-weight: 900;
+}
+
+.ppm-finance-rag-badge.green {
+  background: #16a34a;
+  color: #fff;
+}
+.ppm-finance-rag-badge.amber {
+  background: #f59e0b;
+  color: #172033;
+}
+.ppm-finance-rag-badge.red {
+  background: #dc2626;
+  color: #fff;
+}
+
+[data-ppm-permission-hidden="true"] {
+  display: none !important;
+}
+
+.ppm-control-restricted {
+  cursor: not-allowed !important;
+  opacity: 0.55 !important;
+}
+
+.ppm-notification-centre {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.ppm-notification-bell {
+  position: relative;
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 9px;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+
+.ppm-notification-bell:hover,
+.ppm-notification-bell[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.ppm-notification-bell:focus-visible,
+.ppm-notification-panel button:focus-visible {
+  outline: 3px solid rgba(157, 220, 249, 0.65);
+  outline-offset: 2px;
+}
+
+.ppm-notification-bell svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.ppm-notification-badge {
+  position: absolute;
+  top: -7px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 2px solid var(--ppm-auth-plum);
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 16px;
+  text-align: center;
+}
+
+.ppm-notification-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 5000;
+  width: min(440px, calc(100vw - 28px));
+  overflow: hidden;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  color: #172033;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  text-align: left;
+}
+
+.ppm-notification-panel[hidden] {
+  display: none !important;
+}
+
+.ppm-notification-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 17px 18px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ppm-notification-panel-head h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 19px;
+}
+
+.ppm-notification-summary {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.ppm-notification-close {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  place-items: center;
+  background: #f1f5f9;
+  color: #475569;
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.ppm-notification-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.ppm-notification-filters {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+}
+
+.ppm-notification-filters button,
+.ppm-notification-mark-all,
+.ppm-notification-read-toggle {
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ppm-notification-filters button {
+  padding: 6px 8px;
+  border-radius: 999px;
+}
+
+.ppm-notification-filters button:hover,
+.ppm-notification-filters button.active {
+  background: #e6f6fd;
+  color: var(--ppm-auth-plum-dark);
+}
+
+.ppm-notification-filters span {
+  display: inline-flex;
+  min-width: 17px;
+  height: 17px;
+  margin-left: 3px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 9px;
+}
+
+.ppm-notification-mark-all {
+  color: #0f6c91;
+}
+
+.ppm-notification-mark-all:disabled {
+  color: #94a3b8;
+  cursor: default;
+}
+
+.ppm-notification-list {
+  max-height: min(64vh, 620px);
+  overflow-y: auto;
+}
+
+.ppm-notification-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-bottom: 1px solid #e2e8f0;
+  border-left: 5px solid #9ddcf9;
+  background: #fff;
+}
+
+.ppm-notification-item.unread {
+  background: #f3faff;
+}
+
+.ppm-notification-item.severity-critical {
+  border-left-color: #dc2626;
+}
+.ppm-notification-item.severity-high {
+  border-left-color: #f59e0b;
+}
+.ppm-notification-item.severity-info {
+  border-left-color: #64748b;
+}
+
+.ppm-notification-open {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px 8px 13px 14px;
+  border: 0;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ppm-notification-open:hover strong {
+  color: var(--ppm-auth-plum);
+  text-decoration: underline;
+}
+
+.ppm-notification-open strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ppm-notification-kind {
+  color: var(--ppm-auth-plum);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ppm-notification-detail,
+.ppm-notification-meta {
+  color: #475569;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.ppm-notification-meta {
+  color: #64748b;
+}
+
+.ppm-notification-read-toggle {
+  align-self: center;
+  margin-right: 10px;
+  padding: 6px;
+  color: #0f6c91;
+}
+
+.ppm-notification-item.read .ppm-notification-open {
+  opacity: 0.72;
+}
+
+.ppm-notification-empty {
+  display: grid;
+  gap: 7px;
+  padding: 34px 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+.ppm-notification-empty strong {
+  color: #334155;
+  font-size: 14px;
+}
+
+.ppm-notification-empty span {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ppm-notification-target {
+  position: relative;
+  outline: 4px solid rgba(14, 165, 233, 0.38) !important;
+  outline-offset: -3px;
+  animation: ppm-notification-pulse 1.2s ease-out 2;
+}
+
+@keyframes ppm-notification-pulse {
+  0%,
+  100% {
+    outline-color: rgba(14, 165, 233, 0.28);
+  }
+  50% {
+    outline-color: rgba(220, 38, 38, 0.62);
+  }
+}
+
+@media (max-width: 760px) {
+  header.ppm-auth-header {
+    padding-right: var(--page-gutter, var(--gutter, 18px)) !important;
+  }
+
+  .ppm-session-bar {
+    position: static;
+    margin-top: 15px;
+    transform: none;
+  }
+
+  .ppm-session-identity {
+    flex: 1;
+    text-align: left;
+  }
+
+  .ppm-session-name,
+  .ppm-session-role {
+    max-width: none;
+  }
+
+  .ppm-notification-panel {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .ppm-notification-tools {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ppm-notification-mark-all {
+    align-self: flex-end;
+  }
+}

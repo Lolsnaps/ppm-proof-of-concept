@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Home | Foresters Portfolio</title>
+    <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+    <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+    <script src="ppm-core.js?v=2026.08.09.11"></script>
+    <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+    <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+    <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+    <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+    <link rel="stylesheet" href="home-page.css?v=2026.08.09.11" />
+  </head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Your portfolio landing page</p>
+    </header>
+    <nav aria-label="Primary navigation">
+      <a class="active" href="home.html">Home</a><a href="index.html">Projects</a
+      ><a href="programme.html">Programmes</a><a href="milestones.html">Milestones</a
+      ><a href="raid-log.html">RAID Log</a><a href="registers.html">Registers</a
+      ><a href="benefits-management.html">Benefits</a><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <section class="welcome">
+        <div>
+          <h2 id="welcomeTitle">Welcome</h2>
+          <p id="welcomeCopy">Here is the delivery information available to you today.</p>
+        </div>
+        <div id="today" class="date"></div>
+      </section>
+      <div class="scope-card">
+        <strong id="roleScope"></strong>
+        <p id="roleDescription"></p>
+      </div>
+      <section class="summary" aria-label="Personal delivery summary">
+        <div class="stat">
+          <div class="stat-label">Projects in your scope</div>
+          <div id="projectCount" class="stat-value">0</div>
+          <div class="stat-note">Active and archived records you are permitted to view</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Tasks assigned to you</div>
+          <div id="taskCount" class="stat-value">0</div>
+          <div class="stat-note">Open project-plan tasks where you are the owner</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Open actions</div>
+          <div id="actionCount" class="stat-value">0</div>
+          <div class="stat-note">Actions currently assigned to you</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Approvals awaiting you</div>
+          <div id="approvalCount" class="stat-value">0</div>
+          <div class="stat-note">Governance, budget, baseline and other decisions assigned to you</div>
+        </div>
+      </section>
+      <section class="layout">
+        <div>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>My projects</h3>
+              <p>Projects are limited by your role and configured project scope.</p>
+            </div>
+            <div id="projectList" class="list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>My open work</h3>
+              <p>Tasks, actions and approval decisions assigned to your Resource account.</p>
+            </div>
+            <div id="workList" class="list"></div>
+          </section>
+        </div>
+        <aside>
+          <section class="panel">
+            <div class="panel-head">
+              <h3>Available areas</h3>
+              <p>Only pages included in your current permission level are shown.</p>
+            </div>
+            <div class="module-grid">
+              <a class="module" href="index.html" data-permission="projects.view"
+                ><span class="module-icon">P</span>
+                <div class="module-title">Projects</div>
+                <div class="module-copy">Project profiles, plans and status.</div></a
+              >
+              <a class="module" href="reports.html" data-permission="reports.view"
+                ><span class="module-icon">R</span>
+                <div class="module-title">Reports</div>
+                <div class="module-copy">Portfolio and stakeholder views.</div></a
+              >
+              <a class="module" href="resource-management.html" data-permission="resourceManagement.view"
+                ><span class="module-icon">A</span>
+                <div class="module-title">Allocations</div>
+                <div class="module-copy">Resource demand and availability.</div></a
+              >
+              <a class="module" href="financial-management.html" data-permission="financials.viewRag"
+                ><span class="module-icon">£</span>
+                <div class="module-title">Financials</div>
+                <div class="module-copy">Financial RAG or detailed cost control.</div></a
+              >
+              <a class="module" href="raid-log.html" data-permission="raid.view"
+                ><span class="module-icon">!</span>
+                <div class="module-title">RAID</div>
+                <div class="module-copy">Risks, assumptions, issues and dependencies.</div></a
+              >
+              <a class="module" href="stage-gates.html" data-permission="stageGates.view"
+                ><span class="module-icon">G</span>
+                <div class="module-title">Stage Gates</div>
+                <div class="module-copy">Lifecycle submissions, evidence and independent decisions.</div></a
+              >
+              <a class="module" href="administration.html" data-permission="administration.view"
+                ><span class="module-icon">C</span>
+                <div class="module-title">Administration</div>
+                <div class="module-copy">
+                  Portfolios, lifecycles, reference lists and reporting calendars.
+                </div></a
+              >
+              <a class="module" href="audit-history.html" data-permission="audit.view"
+                ><span class="module-icon">H</span>
+                <div class="module-title">Audit</div>
+                <div class="module-copy">Change and approval history.</div></a
+              >
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="home-page.js?v=2026.08.09.11"></script>
+  </body>
+</html>

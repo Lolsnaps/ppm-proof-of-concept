@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Benefits Management | Foresters Portfolio</title>
+  <link rel="stylesheet" href="benefits-management-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Project, programme and portfolio management</p>
+    </header>
+    <nav>
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html">Registers</a><a href="benefits-management.html" class="active">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div class="page-heading">
+        <div>
+          <h2>Benefits Management</h2>
+          <p>
+            Define, own and review measurable benefits at project or programme level. These records feed
+            portfolio dashboards, formal status reporting and global search.
+          </p>
+        </div>
+        <div class="heading-actions">
+          <button id="saveButton" type="button" class="button" disabled data-permission="benefits.edit">Saved</button
+          ><button id="addBenefitButton" type="button" class="button light" data-permission="benefits.edit">Add benefit row</button>
+        </div>
+      </div>
+
+      <section class="summary-grid" aria-label="Benefits summary">
+        <div class="summary-card">
+          <div class="summary-label">Benefits in view</div>
+          <div id="totalBenefits" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">In delivery</div>
+          <div id="deliveryBenefits" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Realised</div>
+          <div id="realisedBenefits" class="summary-value good">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Low confidence / not realised</div>
+          <div id="atRiskBenefits" class="summary-value danger">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Reviews overdue</div>
+          <div id="overdueBenefits" class="summary-value warning">0</div>
+        </div>
+      </section>
+
+      <section class="scope-guide" aria-label="Benefit linkage guidance">
+        <div>
+          <h3>Project benefit</h3>
+          <p>
+            Use when delivery and accountability sit with one project. Its programme is populated from the
+            Project Register for portfolio roll-up.
+          </p>
+        </div>
+        <div>
+          <h3>Programme benefit</h3>
+          <p>
+            Use when the outcome depends on several projects or is realised collectively. A project link is
+            then optional and the programme remains the accountable level.
+          </p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Benefit register</h3>
+            <p>
+              Add and edit rows directly, then select Save changes. Required fields are validated before
+              browser storage is updated.
+            </p>
+          </div>
+          <div id="unsavedIndicator" class="unsaved">All changes saved</div>
+        </div>
+        <div class="filters">
+          <input
+            id="benefitSearch"
+            type="search"
+            placeholder="Search benefit ID, description, owner or measure"
+            aria-label="Search benefits"
+          />
+          <select id="programmeFilter" aria-label="Filter benefits by programme">
+            <option value="">All programmes</option>
+          </select>
+          <select id="projectFilter" aria-label="Filter benefits by project">
+            <option value="">All projects</option>
+          </select>
+          <select id="statusFilter" aria-label="Filter benefits by status">
+            <option value="">All statuses</option>
+          </select>
+        </div>
+        <div class="table-wrapper">
+          <table class="benefit-table">
+            <thead>
+              <tr>
+                <th class="mw-120">Benefit ID</th>
+                <th class="mw-135">Level *</th>
+                <th class="mw-200">Programme *</th>
+                <th class="mw-215">Project</th>
+                <th class="mw-270">Benefit *</th>
+                <th class="mw-170">Type *</th>
+                <th class="mw-190">Owner *</th>
+                <th class="mw-145">Baseline</th>
+                <th class="mw-145">Target *</th>
+                <th class="mw-120">Unit</th>
+                <th class="mw-145">Current value</th>
+                <th class="mw-165">Target realisation *</th>
+                <th class="mw-170">Status *</th>
+                <th class="mw-145">Confidence</th>
+                <th class="mw-145">Next review</th>
+                <th class="mw-230">Measurement method</th>
+                <th class="mw-230">Commentary</th>
+                <th class="mw-200">Evidence</th>
+                <th class="mw-170">Row actions</th>
+              </tr>
+            </thead>
+            <tbody id="benefitBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state">
+          No benefits match the selected filters. Add a row to create the first benefit.
+        </div>
+      </section>
+    </main>
+
+    <div
+      id="deleteConfirmation"
+      class="confirmation-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteTitle"
+    >
+      <div class="confirmation-bubble">
+        <h2 id="deleteTitle">Delete benefit row?</h2>
+        <p id="deleteMessage"></p>
+        <div class="confirmation-actions">
+          <button id="cancelDeleteButton" type="button" class="button light" data-permission="none">Keep benefit</button
+          ><button id="confirmDeleteButton" type="button" class="button danger" data-permission="benefits.edit">Delete benefit row</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-governance-utils.js?v=2026.08.09.11|ppm-register-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|benefits-management-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+  </body>
+</html>

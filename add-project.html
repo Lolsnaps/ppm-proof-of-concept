@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+
+  <title>Add Project | PPM Tool</title>
+
+  <link rel="stylesheet" href="add-project-page.css?v=2026.08.09.11" />
+</head>
+
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+
+    <nav>
+      <a href="index.html"> Projects </a>
+
+      <a href="programme.html"> Programmes </a>
+
+      <a id="milestonesNavigation" href="milestones.html"> Milestones </a>
+
+      <a href="raid-log.html"> RAID Log </a>
+
+      <a href="registers.html"> Registers </a>
+
+      <a href="benefits-management.html"> Benefits </a>
+
+      <a href="resource-directory.html"> Resources </a>
+
+      <a href="resource-management.html"> Resource Management </a>
+
+      <a href="financial-management.html"> Financials </a>
+
+      <a href="audit-history.html"> Audit History </a>
+
+      <a href="reports.html"> Reports &amp; Dashboards </a>
+
+      <a href="search.html" class="nav-search" aria-label="Global search">
+        <svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span>
+      </a>
+    </nav>
+
+    <main>
+      <div class="page-heading">
+        <div>
+          <h2 id="pageTitle">Add project</h2>
+
+          <p id="pageDescription">Create a new project record and add its initial delivery information.</p>
+        </div>
+
+        <div id="projectReference" class="project-reference">New project</div>
+      </div>
+
+      <div id="pageMessage" class="message" role="alert"></div>
+
+      <form id="projectForm" class="form-panel" novalidate>
+        <section id="projectDetailsSection" class="form-section">
+          <div class="section-heading">
+            <h3>Project details</h3>
+
+            <p>Enter the core information used to identify and manage the project.</p>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="projectCode">
+                Project code
+                <span class="required">*</span>
+              </label>
+
+              <input id="projectCode" name="projectCode" type="text" readonly />
+
+              <p class="help-text">Generated automatically and cannot be changed.</p>
+            </div>
+
+            <div class="form-field">
+              <label for="projectName">
+                Project name
+                <span class="required">*</span>
+              </label>
+
+              <input
+                id="projectName"
+                name="projectName"
+                type="text"
+                maxlength="200"
+                required
+                placeholder="Enter the project name"
+              />
+            </div>
+
+            <div class="form-field">
+              <label for="shortName">Short name</label>
+              <input
+                id="shortName"
+                name="shortName"
+                type="text"
+                maxlength="80"
+                placeholder="Short project name"
+              />
+            </div>
+
+            <div class="form-field">
+              <label for="formerName">Former name or alias</label>
+              <input
+                id="formerName"
+                name="formerName"
+                type="text"
+                maxlength="160"
+                placeholder="Previous or alternative name"
+              />
+            </div>
+
+            <div class="form-field">
+              <label for="projectType">Project type</label>
+              <select id="projectType" name="projectType">
+                <option value="">Not set</option>
+                <option>Change project</option>
+                <option>Programme project</option>
+                <option>Regulatory change</option>
+                <option>Technology delivery</option>
+                <option>Product change</option>
+                <option>BAU initiative</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="projectClassification">Classification</label>
+              <select id="projectClassification" name="projectClassification">
+                <option value="">Not set</option>
+                <option>Strategy</option>
+                <option>Regulatory</option>
+                <option>Mandatory</option>
+                <option>Operational</option>
+                <option>Technology</option>
+                <option>Product</option>
+                <option>BAU</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="businessArea">Business area</label>
+              <select id="businessArea" name="businessArea">
+                <option value="">Not set</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="confidentialityClassification">Confidentiality</label>
+              <select id="confidentialityClassification" name="confidentialityClassification">
+                <option>Internal</option>
+                <option>Public</option>
+                <option>Confidential</option>
+                <option>Highly Confidential</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="portfolio">Portfolio</label>
+              <select id="portfolio" name="portfolio">
+                <option value="">Select a portfolio</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="lifecycleTemplateId">Lifecycle template</label>
+              <select id="lifecycleTemplateId" name="lifecycleTemplateId">
+                <option value="">Select a lifecycle template</option>
+              </select>
+              <input id="lifecycleTemplateVersion" type="hidden" value="1" />
+              <p class="help-text">The template controls stages, gates and mandatory information.</p>
+            </div>
+
+            <div class="form-field">
+              <label for="requestor">Requestor</label>
+              <select id="requestor" name="requestor">
+                <option value="">Select a requestor</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="projectManager"> Project manager </label>
+
+              <select id="projectManager" name="projectManager">
+                <option value="">Select a project manager</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="sponsor"> Project sponsor </label>
+
+              <select id="sponsor" name="sponsor">
+                <option value="">Select a project sponsor</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="projectLead"> Project lead </label>
+
+              <select id="projectLead" name="projectLead">
+                <option value="">Select a project lead</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="workstream">Programme / workstream</label>
+
+              <select id="workstream" name="workstream">
+                <option value="">Select a programme / workstream</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="priority"> Priority </label>
+
+              <select id="priority" name="priority">
+                <option value="Not Set">Not set</option>
+
+                <option value="Critical">Critical</option>
+
+                <option value="High">High</option>
+
+                <option value="Medium">Medium</option>
+
+                <option value="Low">Low</option>
+              </select>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="description">
+                Project description
+                <span class="required">*</span>
+              </label>
+
+              <textarea
+                id="description"
+                name="description"
+                class="large-textarea"
+                maxlength="4000"
+                required
+                placeholder="Describe what the project will deliver and why it is required"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="highLevelScope"> High-level scope </label>
+
+              <textarea
+                id="highLevelScope"
+                name="highLevelScope"
+                maxlength="4000"
+                placeholder="Describe the work included within the project"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="outOfScope"> Out of scope </label>
+
+              <textarea
+                id="outOfScope"
+                name="outOfScope"
+                maxlength="4000"
+                placeholder="Describe anything explicitly excluded from the project"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="inScope">Detailed in-scope items</label>
+              <textarea
+                id="inScope"
+                name="inScope"
+                maxlength="4000"
+                placeholder="List the products, processes, teams or deliverables included"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="businessProblem">Background or business problem</label>
+              <textarea
+                id="businessProblem"
+                name="businessProblem"
+                maxlength="4000"
+                placeholder="Describe the problem or opportunity that prompted the project"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="desiredOutcome">Desired outcome</label>
+              <textarea
+                id="desiredOutcome"
+                name="desiredOutcome"
+                maxlength="4000"
+                placeholder="Describe the outcome the project is expected to achieve"
+              ></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section id="ownershipSection" class="form-section">
+          <div class="section-heading">
+            <h3>Delivery ownership</h3>
+            <p>Assign the accountable and supporting roles used throughout delivery and reporting.</p>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="deputyProjectManager">Deputy project manager</label
+              ><select id="deputyProjectManager">
+                <option value="">Select a deputy project manager</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="businessOwner">Business owner</label
+              ><select id="businessOwner">
+                <option value="">Select a business owner</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="technicalLead">Technical lead</label
+              ><select id="technicalLead">
+                <option value="">Select a technical lead</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="businessAnalyst">Business analyst</label
+              ><select id="businessAnalyst">
+                <option value="">Select a business analyst</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="testLead">Test lead</label
+              ><select id="testLead">
+                <option value="">Select a test lead</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="changeLead">Change / operational-readiness lead</label
+              ><select id="changeLead">
+                <option value="">Select a change lead</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="financeContact">Finance contact</label
+              ><select id="financeContact">
+                <option value="">Select a finance contact</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="complianceContact">Compliance contact</label
+              ><select id="complianceContact">
+                <option value="">Select a compliance contact</option>
+              </select>
+            </div>
+            <div class="form-field full-width">
+              <label for="additionalStakeholders">Additional stakeholders</label
+              ><textarea
+                id="additionalStakeholders"
+                maxlength="4000"
+                placeholder="Record other stakeholders, groups or governance attendees"
+              ></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section id="strategicSection" class="form-section">
+          <div class="section-heading">
+            <h3>Strategic information</h3>
+            <p>
+              Explain why the project is required, the outcomes expected and how success will be measured.
+            </p>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="businessPriority">Business priority</label
+              ><select id="businessPriority">
+                <option value="">Not set</option>
+                <option>Critical</option>
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="strategicDriver">Strategic or regulatory driver</label
+              ><select id="strategicDriver">
+                <option value="">Not set</option>
+                <option>Strategic</option>
+                <option>Regulatory</option>
+                <option>Mandatory</option>
+                <option>Customer</option>
+                <option>Risk reduction</option>
+                <option>Operational efficiency</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="mandatoryDeliveryDate">Mandatory delivery date</label
+              ><input id="mandatoryDeliveryDate" type="date" />
+            </div>
+            <div class="form-field full-width">
+              <label for="strategicObjective">Strategic objective</label
+              ><textarea id="strategicObjective" maxlength="4000"></textarea>
+            </div>
+            <div class="form-field full-width">
+              <label for="regulatoryDriver">Regulatory driver or obligation</label
+              ><textarea id="regulatoryDriver" maxlength="4000"></textarea>
+            </div>
+            <div class="form-field full-width">
+              <label for="customerOutcome">Customer outcome</label
+              ><textarea id="customerOutcome" maxlength="4000"></textarea>
+            </div>
+            <div class="form-field full-width">
+              <label for="expectedBenefits">Expected benefits</label
+              ><textarea id="expectedBenefits" maxlength="4000"></textarea>
+            </div>
+            <div class="form-field">
+              <label for="benefitOwner">Benefit owner</label
+              ><select id="benefitOwner">
+                <option value="">Select a benefit owner</option>
+              </select>
+            </div>
+            <div class="form-field two-columns">
+              <label for="successMeasures">Success measures</label
+              ><textarea id="successMeasures" maxlength="4000"></textarea>
+            </div>
+            <div class="form-field full-width">
+              <label for="strategicDependencies">Dependencies on strategic initiatives</label
+              ><textarea id="strategicDependencies" maxlength="4000"></textarea>
+            </div>
+            <div class="form-field full-width">
+              <label for="initialResourceRequirements">Initial resource requirements</label
+              ><textarea
+                id="initialResourceRequirements"
+                maxlength="4000"
+                placeholder="Summarise the teams, roles or specialist capacity required"
+              ></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section id="lifecycleSection" class="form-section">
+          <div class="section-heading">
+            <h3>Lifecycle and delivery dates</h3>
+
+            <p>Record the current project phase and expected delivery position.</p>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="projectStatus">
+                Project status
+                <span class="required">*</span>
+              </label>
+
+              <select id="projectStatus" name="projectStatus" required>
+                <option value="Proposed">Proposed</option>
+                <option value="Planned">Planned</option>
+                <option value="Active">Active</option>
+                <option value="On Hold">On Hold</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="currentStage"> Current stage </label>
+
+              <select id="currentStage" name="currentStage">
+                <option value="Intake">Intake</option>
+
+                <option value="Discovery">Discovery</option>
+
+                <option value="Requirements and Design">Requirements and Design</option>
+
+                <option value="Build">Build</option>
+
+                <option value="Test">Test</option>
+
+                <option value="Implementation">Implementation</option>
+
+                <option value="Hypercare">Hypercare</option>
+
+                <option value="Closure">Closure</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="nextStage"> Next stage </label>
+
+              <select id="nextStage" name="nextStage">
+                <option value="">Not set</option>
+
+                <option value="Discovery">Discovery</option>
+
+                <option value="Requirements and Design">Requirements and Design</option>
+
+                <option value="Build">Build</option>
+
+                <option value="Test">Test</option>
+
+                <option value="Implementation">Implementation</option>
+
+                <option value="Hypercare">Hypercare</option>
+
+                <option value="Closure">Closure</option>
+              </select>
+            </div>
+
+            <div id="stageOverrideField" class="form-field full-width" hidden>
+              <label for="stageOverrideReason"
+                >Stage override justification <span class="required">*</span></label
+              >
+              <textarea
+                id="stageOverrideReason"
+                maxlength="2000"
+                placeholder="Explain why the project stage is being changed without an approved formal stage gate."
+              ></textarea>
+              <p class="help-text">
+                This exceptional change is retained in Audit History. Normal progression is completed from
+                Stage Gates.
+              </p>
+            </div>
+
+            <div class="form-field">
+              <label for="approvalStatus">Approval status</label
+              ><select id="approvalStatus">
+                <option>Draft</option>
+                <option>Pending Approval</option>
+                <option>Approved</option>
+                <option>Conditionally Approved</option>
+                <option>Rejected</option>
+                <option>Deferred</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="dateLogged">Date logged</label><input id="dateLogged" type="date" />
+            </div>
+            <div class="form-field">
+              <label for="proposedStartDate">Proposed start date</label
+              ><input id="proposedStartDate" type="date" />
+            </div>
+            <div class="form-field">
+              <label for="currentStageGate">Current stage gate</label
+              ><input id="currentStageGate" maxlength="180" placeholder="Current governance gate" />
+            </div>
+            <div class="form-field">
+              <label for="nextStageGateDate">Next stage-gate date</label
+              ><input id="nextStageGateDate" type="date" />
+            </div>
+
+            <div class="form-field">
+              <label for="baselineStartDate"> Baseline start date </label>
+
+              <input id="baselineStartDate" name="baselineStartDate" type="date" />
+            </div>
+
+            <div class="form-field">
+              <label for="baselineEndDate"> Baseline end date </label>
+
+              <input id="baselineEndDate" name="baselineEndDate" type="date" />
+            </div>
+
+            <div class="form-field">
+              <label for="forecastStartDate"> Forecast start date </label>
+
+              <input id="forecastStartDate" name="forecastStartDate" type="date" />
+            </div>
+
+            <div class="form-field">
+              <label for="forecastEndDate"> Forecast end date </label>
+
+              <input id="forecastEndDate" name="forecastEndDate" type="date" />
+            </div>
+
+            <div class="form-field">
+              <label for="targetImplementationDate"> Target implementation date </label>
+
+              <input id="targetImplementationDate" name="targetImplementationDate" type="date" />
+            </div>
+
+            <div class="form-field">
+              <label for="actualStartDate">Actual start date</label><input id="actualStartDate" type="date" />
+            </div>
+            <div class="form-field">
+              <label for="actualEndDate">Actual end date</label><input id="actualEndDate" type="date" />
+            </div>
+            <div class="form-field">
+              <label for="closureDate">Closure date</label><input id="closureDate" type="date" />
+            </div>
+
+            <div class="form-field">
+              <label for="percentageComplete">
+                Percentage complete
+                <span class="required">*</span>
+              </label>
+
+              <input
+                id="percentageComplete"
+                name="percentageComplete"
+                type="number"
+                min="0"
+                max="100"
+                value="0"
+                required
+              />
+            </div>
+
+            <div id="slippageWarning" class="slippage-warning">
+              The forecast end date is later than the baseline end date. A reason for slippage and
+              return-to-green action must be entered.
+            </div>
+          </div>
+        </section>
+
+        <section id="lifecycleAssuranceSection" class="form-section">
+          <div class="section-heading">
+            <h3>Lifecycle readiness</h3>
+            <p>
+              Required information increases as the project progresses. Complete the visible stage information
+              before saving or advancing the project.
+            </p>
+          </div>
+          <div id="lifecycleReadiness" class="lifecycle-readiness" aria-live="polite">
+            <h4 id="lifecycleReadinessTitle">Intake readiness</h4>
+            <p id="lifecycleReadinessText">
+              Complete the required project information for the selected stage.
+            </p>
+            <ul id="lifecycleMissingList" class="lifecycle-missing-list"></ul>
+          </div>
+          <div class="lifecycle-groups">
+            <div class="lifecycle-group" data-stage-level="1">
+              <h4>Discovery information</h4>
+              <p>Confirm the discovery evidence, assumptions, initial RAID, cost and resource position.</p>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="sponsorConfirmationStatus">Sponsor confirmation</label
+                  ><select id="sponsorConfirmationStatus">
+                    <option value="">Not set</option>
+                    <option>Proposed</option>
+                    <option>Confirmed</option>
+                  </select>
+                </div>
+                <div class="form-field full-width">
+                  <label for="assumptionsConstraints">Assumptions and constraints</label
+                  ><textarea id="assumptionsConstraints"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="initialRaidSummary">Initial RAID summary</label
+                  ><textarea id="initialRaidSummary"></textarea>
+                </div>
+                <div class="form-field">
+                  <label for="indicativeCosts">Indicative costs (£)</label
+                  ><input id="indicativeCosts" type="number" min="0" step="1000" />
+                </div>
+                <div class="form-field two-columns">
+                  <label for="resourceDemandSummary">Indicative resource demand</label
+                  ><textarea id="resourceDemandSummary"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="discoveryDeliverables">Discovery deliverables</label
+                  ><textarea id="discoveryDeliverables"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="lifecycle-group" data-stage-level="2">
+              <h4>Requirements and design information</h4>
+              <p>Capture the approved requirements, solution, plan, resource, cost and readiness evidence.</p>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="requirementsApprovalStatus">Requirements approval</label
+                  ><select id="requirementsApprovalStatus">
+                    <option value="">Not set</option>
+                    <option>Draft</option>
+                    <option>Pending Approval</option>
+                    <option>Approved</option>
+                    <option>Rejected</option>
+                  </select>
+                </div>
+                <div class="form-field two-columns">
+                  <label for="solutionOptions">Solution options and selected approach</label
+                  ><textarea id="solutionOptions"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="deliveryPlanSummary">Confirmed delivery plan</label
+                  ><textarea id="deliveryPlanSummary"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="detailedResourceDemand">Detailed resource demand</label
+                  ><textarea id="detailedResourceDemand"></textarea>
+                </div>
+                <div class="form-field">
+                  <label for="costEstimate">Cost estimate (£)</label
+                  ><input id="costEstimate" type="number" min="0" step="1000" />
+                </div>
+                <div class="form-field">
+                  <label for="fundingSource">Funding source</label
+                  ><input id="fundingSource" maxlength="240" placeholder="Approved source or cost centre" />
+                </div>
+                <div class="form-field two-columns">
+                  <label for="deliveryDependencies">Delivery dependencies</label
+                  ><textarea id="deliveryDependencies"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="testApproach">Test approach</label><textarea id="testApproach"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="operationalReadinessRequirements">Operational-readiness requirements</label
+                  ><textarea id="operationalReadinessRequirements"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="implementationApproach">Implementation approach</label
+                  ><textarea id="implementationApproach"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="benefitMeasures">Benefit measures</label
+                  ><textarea id="benefitMeasures"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="lifecycle-group" data-stage-level="3">
+              <h4>Build and test information</h4>
+              <p>Confirm the approved baseline, delivery evidence, test position and go-live criteria.</p>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="baselineApprovalStatus">Baseline approval</label
+                  ><select id="baselineApprovalStatus">
+                    <option value="">Not set</option>
+                    <option>Pending Approval</option>
+                    <option>Approved</option>
+                    <option>Rejected</option>
+                  </select>
+                </div>
+                <div class="form-field two-columns">
+                  <label for="testDatesStatus">Test dates and current status</label
+                  ><textarea id="testDatesStatus"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="defectsBlockers">Defects or delivery blockers</label
+                  ><textarea id="defectsBlockers"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="deploymentDependencies">Deployment dependencies</label
+                  ><textarea id="deploymentDependencies"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="goLiveCriteria">Go-live criteria</label
+                  ><textarea id="goLiveCriteria"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="lifecycle-group" data-stage-level="5">
+              <h4>Implementation information</h4>
+              <p>Record implementation approvals, readiness, communications and support arrangements.</p>
+              <div class="form-grid">
+                <div class="form-field">
+                  <label for="approvedImplementationDate">Approved implementation date</label
+                  ><input id="approvedImplementationDate" type="date" />
+                </div>
+                <div class="form-field">
+                  <label for="goLiveApprovalStatus">Go-live approval</label
+                  ><select id="goLiveApprovalStatus">
+                    <option value="">Not set</option>
+                    <option>Pending Approval</option>
+                    <option>Approved</option>
+                    <option>Conditionally Approved</option>
+                    <option>Rejected</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="operationalReadinessStatus">Operational-readiness status</label
+                  ><select id="operationalReadinessStatus">
+                    <option value="">Not set</option>
+                    <option>Not Started</option>
+                    <option>In Progress</option>
+                    <option>Ready</option>
+                    <option>Not Ready</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="trainingStatus">Training status</label
+                  ><select id="trainingStatus">
+                    <option value="">Not set</option>
+                    <option>Not Required</option>
+                    <option>Not Started</option>
+                    <option>In Progress</option>
+                    <option>Complete</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="communicationsStatus">Communications status</label
+                  ><select id="communicationsStatus">
+                    <option value="">Not set</option>
+                    <option>Not Required</option>
+                    <option>Not Started</option>
+                    <option>In Progress</option>
+                    <option>Complete</option>
+                  </select>
+                </div>
+                <div class="form-field full-width">
+                  <label for="supportModel">Support model</label><textarea id="supportModel"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="hypercarePlan">Hypercare plan</label><textarea id="hypercarePlan"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="rollbackPlan">Rollback plan</label><textarea id="rollbackPlan"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="outstandingRisksIssues">Outstanding risks and issues</label
+                  ><textarea id="outstandingRisksIssues"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="lifecycle-group" data-stage-level="7">
+              <h4>Closure information</h4>
+              <p>Complete the closure, financial, benefits and lessons-learned handover.</p>
+              <div class="form-grid">
+                <div class="form-field full-width">
+                  <label for="closureSummary">Closure summary</label><textarea id="closureSummary"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="finalFinancialPosition">Final financial position</label
+                  ><textarea id="finalFinancialPosition"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="outstandingActions">Outstanding actions</label
+                  ><textarea id="outstandingActions"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="benefitsHandover">Benefits handover</label
+                  ><textarea id="benefitsHandover"></textarea>
+                </div>
+                <div class="form-field full-width">
+                  <label for="lessonsLearned">Lessons learned</label><textarea id="lessonsLearned"></textarea>
+                </div>
+                <div class="form-field">
+                  <label for="closureApprovalStatus">Closure approval</label
+                  ><select id="closureApprovalStatus">
+                    <option value="">Not set</option>
+                    <option>Pending Approval</option>
+                    <option>Approved</option>
+                    <option>Rejected</option>
+                  </select>
+                </div>
+                <div class="form-field two-columns">
+                  <label for="archiveLocation">Archive location</label
+                  ><input
+                    id="archiveLocation"
+                    type="url"
+                    placeholder="SharePoint or governed repository link"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="projectStatusSection" class="form-section">
+          <div class="section-heading">
+            <h3>Project status</h3>
+
+            <p>Record the project health assessment and current delivery commentary.</p>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="overallRag">
+                Overall RAG
+                <span class="required">*</span>
+              </label>
+
+              <select id="overallRag" name="overallRag" required>
+                <option value="Not Assessed">Not Assessed</option>
+
+                <option value="Green">Green</option>
+
+                <option value="Amber">Amber</option>
+
+                <option value="Red">Red</option>
+              </select>
+
+              <span id="ragPreview" class="rag-preview"> Not Assessed </span>
+            </div>
+
+            <div class="form-field">
+              <label for="scheduleRag">Schedule RAG</label>
+              <select id="scheduleRag" name="scheduleRag">
+                <option value="Not Assessed">Not Assessed</option>
+                <option value="Green">Green</option>
+                <option value="Amber">Amber</option>
+                <option value="Red">Red</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="scopeRag">Scope RAG</label>
+              <select id="scopeRag" name="scopeRag">
+                <option value="Not Assessed">Not Assessed</option>
+                <option value="Green">Green</option>
+                <option value="Amber">Amber</option>
+                <option value="Red">Red</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="financialRag">Financial RAG</label>
+              <select id="financialRag" name="financialRag">
+                <option value="Not Assessed">Not Assessed</option>
+                <option value="Green">Green</option>
+                <option value="Amber">Amber</option>
+                <option value="Red">Red</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="resourceRag">Resources RAG</label>
+              <select id="resourceRag" name="resourceRag">
+                <option value="Not Assessed">Not Assessed</option>
+                <option value="Green">Green</option>
+                <option value="Amber">Amber</option>
+                <option value="Red">Red</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="riskRag">Risk RAG</label>
+              <select id="riskRag" name="riskRag">
+                <option value="Not Assessed">Not Assessed</option>
+                <option value="Green">Green</option>
+                <option value="Amber">Amber</option>
+                <option value="Red">Red</option>
+              </select>
+            </div>
+
+            <div class="form-field">
+              <label for="benefitRag">Benefits RAG</label
+              ><select id="benefitRag" name="benefitRag">
+                <option>Not Assessed</option>
+                <option>Green</option>
+                <option>Amber</option>
+                <option>Red</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="qualityRag">Quality RAG</label
+              ><select id="qualityRag" name="qualityRag">
+                <option>Not Assessed</option>
+                <option>Green</option>
+                <option>Amber</option>
+                <option>Red</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="operationalReadinessRag">Operational readiness RAG</label
+              ><select id="operationalReadinessRag" name="operationalReadinessRag">
+                <option>Not Assessed</option>
+                <option>Green</option>
+                <option>Amber</option>
+                <option>Red</option>
+              </select>
+            </div>
+
+            <div class="form-field full-width rag-assessment-summary">
+              <h4>Calculated and reported RAG</h4>
+              <p>
+                The system calculates each dimension from approved baselines, delivery records, RAID and
+                resource demand. Select the reported status above; any override requires a justification and
+                is retained in status history.
+              </p>
+              <button
+                id="configureRagThresholds"
+                type="button"
+                class="button light"
+                data-permission="administration.edit"
+              >
+                Configure calculation thresholds
+              </button>
+            </div>
+
+            <div class="form-field">
+              <label for="deliveryConfidence"> Delivery confidence </label>
+
+              <select id="deliveryConfidence" name="deliveryConfidence">
+                <option value="Not Assessed">Not Assessed</option>
+
+                <option value="Confident">Confident</option>
+
+                <option value="At Risk">At Risk</option>
+
+                <option value="Unlikely">Unlikely</option>
+              </select>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="currentPosition"> Current position </label>
+
+              <textarea
+                id="currentPosition"
+                name="currentPosition"
+                maxlength="4000"
+                placeholder="Summarise the current position of the project"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="nextSteps"> Next steps </label>
+
+              <textarea
+                id="nextSteps"
+                name="nextSteps"
+                maxlength="4000"
+                placeholder="Summarise the immediate next steps"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="reasonForSlippage">
+                Reason for slippage
+                <span id="slippageRequiredMarker" class="required" hidden> * </span>
+              </label>
+
+              <textarea
+                id="reasonForSlippage"
+                name="reasonForSlippage"
+                maxlength="4000"
+                placeholder="Explain why the forecast date is later than the baseline"
+              ></textarea>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="returnToGreen">
+                Return-to-green actions
+                <span id="returnToGreenRequiredMarker" class="required" hidden> * </span>
+              </label>
+
+              <textarea
+                id="returnToGreen"
+                name="returnToGreen"
+                maxlength="4000"
+                placeholder="Describe the actions required to recover the project"
+              ></textarea>
+            </div>
+          </div>
+        </section>
+
+        <div class="form-actions">
+          <a id="cancelLink" href="index.html" class="button light"> Cancel </a>
+
+          <button id="clearButton" type="button" class="button secondary">Clear form</button>
+
+          <button id="saveButton" type="submit" class="button" data-permission="projects.edit">Save project</button>
+        </div>
+      </form>
+    </main>
+
+    <div
+      id="ragConfigModal"
+      class="config-modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ragConfigTitle"
+    >
+      <div class="config-modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="ragConfigTitle">RAG calculation thresholds</h2>
+            <p>Adjust the tolerance and utilisation boundaries used by calculated RAG.</p>
+          </div>
+          <button id="closeRagConfig" type="button" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <form id="ragConfigForm">
+          <div class="config-modal-body">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="scheduleAmberToleranceDays">Schedule amber tolerance (days)</label
+                ><input id="scheduleAmberToleranceDays" type="number" min="0" required />
+              </div>
+              <div class="form-field">
+                <label for="scheduleRedToleranceDays">Schedule red tolerance (days)</label
+                ><input id="scheduleRedToleranceDays" type="number" min="1" required />
+              </div>
+              <div class="form-field">
+                <label for="resourceAmberUtilisation">Resource amber threshold (%)</label
+                ><input id="resourceAmberUtilisation" type="number" min="1" required />
+              </div>
+              <div class="form-field">
+                <label for="resourceRedUtilisation">Resource red threshold (%)</label
+                ><input id="resourceRedUtilisation" type="number" min="1" required />
+              </div>
+              <div class="form-field">
+                <label for="financialAmberVariance">Financial amber variance (%)</label
+                ><input id="financialAmberVariance" type="number" min="0" required />
+              </div>
+              <div class="form-field">
+                <label for="financialRedVariance">Financial red variance (%)</label
+                ><input id="financialRedVariance" type="number" min="1" required />
+              </div>
+              <div class="form-field">
+                <label for="underUtilisationThreshold">Under-utilisation threshold (%)</label
+                ><input id="underUtilisationThreshold" type="number" min="0" max="100" required />
+              </div>
+            </div>
+          </div>
+          <div class="config-modal-footer">
+            <button id="cancelRagConfig" type="button" class="button secondary">Cancel</button
+            ><button type="submit" class="button" data-permission="administration.edit">Save thresholds</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|ppm-governance-utils.js?v=2026.08.09.11|ppm-planning-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|ppm-stage-gate-utils.js?v=2026.08.09.11|add-project-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+    
+    
+  </body>
+</html>

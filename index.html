@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+
+  <title>Projects | PPM Tool</title>
+
+  <link rel="stylesheet" href="index-page.css?v=2026.08.09.11" />
+</head>
+
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+
+    <nav>
+      <a href="index.html" class="active"> Projects </a>
+
+      <a href="programme.html"> Programmes </a>
+
+      <a href="milestones.html"> Milestones </a>
+
+      <a href="raid-log.html"> RAID Log </a>
+
+      <a href="registers.html"> Registers </a>
+
+      <a href="benefits-management.html"> Benefits </a>
+
+      <a href="resource-directory.html"> Resources </a>
+
+      <a href="resource-management.html"> Resource Management </a>
+
+      <a href="financial-management.html"> Financials </a>
+
+      <a href="audit-history.html"> Audit History </a>
+
+      <a href="reports.html"> Reports &amp; Dashboards </a>
+
+      <a href="search.html" class="nav-search" aria-label="Global search">
+        <svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span>
+      </a>
+    </nav>
+
+    <main>
+      <div id="successMessage" class="success-message" role="status"></div>
+
+      <div class="page-heading">
+        <div>
+          <h2>Projects</h2>
+
+          <p>View and maintain project delivery information.</p>
+        </div>
+
+        <a href="add-project.html" class="button" data-permission="projects.create"> Add project </a>
+      </div>
+
+      <section class="summary-grid">
+        <div class="summary-card">
+          <div class="label">Total projects</div>
+
+          <div id="totalProjects" class="number">0</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="label">Active projects</div>
+
+          <div id="activeProjects" class="number">0</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="label">Amber projects</div>
+
+          <div id="amberProjects" class="number">0</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="label">Red projects</div>
+
+          <div id="redProjects" class="number">0</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="label">Archived projects</div>
+          <div id="archivedProjects" class="number">0</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h3>Project register</h3>
+
+          <p>Select a project name or Details to open its project page.</p>
+        </div>
+
+        <div class="filter-row">
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Search by project name, code or manager"
+            aria-label="Search projects"
+          />
+
+          <select id="statusFilter" aria-label="Filter by project status">
+            <option value="">All statuses</option>
+
+            <option value="Proposed">Proposed</option>
+
+            <option value="Planned">Planned</option>
+
+            <option value="Active">Active</option>
+
+            <option value="On Hold">On Hold</option>
+
+            <option value="Completed">Completed</option>
+
+            <option value="Cancelled">Cancelled</option>
+
+            <option value="Rejected">Rejected</option>
+            <option value="Archived">Archived</option>
+          </select>
+
+          <select id="ragFilter" aria-label="Filter by overall RAG status">
+            <option value="">All overall RAG statuses</option>
+
+            <option value="Not Assessed">Not Assessed</option>
+
+            <option value="Green">Green</option>
+
+            <option value="Amber">Amber</option>
+
+            <option value="Red">Red</option>
+          </select>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Project</th>
+                <th>Manager</th>
+                <th>Status</th>
+                <th>Overall RAG</th>
+                <th>Forecast end</th>
+                <th>Complete</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody id="projectTableBody"></tbody>
+          </table>
+        </div>
+
+        <div id="emptyMessage" class="empty-message">
+          <h3>No projects found</h3>
+
+          <p>Change the filters or add a new project.</p>
+        </div>
+      </section>
+    </main>
+
+    <div
+      id="duplicateModal"
+      class="action-modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="duplicateModalTitle"
+    >
+      <div class="action-modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="duplicateModalTitle">Duplicate project</h2>
+            <p>
+              Create a new project template without copying history, approvals, actual dates or closed RAID.
+            </p>
+          </div>
+          <button id="closeDuplicateModal" type="button" class="modal-close" aria-label="Close" data-permission="none">
+            &times;
+          </button>
+        </div>
+        <form id="duplicateForm">
+          <div class="modal-body">
+            <input id="duplicateSourceCode" type="hidden" />
+            <div class="modal-field">
+              <label for="duplicateProjectName">New project name</label
+              ><input id="duplicateProjectName" maxlength="200" required />
+            </div>
+            <div class="modal-field">
+              <label>Information to copy</label>
+              <div class="copy-options">
+                <label class="copy-option"
+                  ><input id="copyRoles" type="checkbox" checked /><span
+                    ><strong>Delivery roles</strong><br />Copy named ownership and supporting roles.</span
+                  ></label
+                >
+                <label class="copy-option"
+                  ><input id="copyPlan" type="checkbox" checked /><span
+                    ><strong>Project plan</strong><br />Copy tasks as not started with new task IDs.</span
+                  ></label
+                >
+                <label class="copy-option"
+                  ><input id="copyMilestones" type="checkbox" checked /><span
+                    ><strong>Milestones</strong><br />Copy milestone templates with new IDs.</span
+                  ></label
+                >
+                <label class="copy-option"
+                  ><input id="copyOpenRaid" type="checkbox" /><span
+                    ><strong>Open RAID</strong><br />Copy open items only; closed items are excluded.</span
+                  ></label
+                >
+                <label class="copy-option"
+                  ><input id="copyLifecycle" type="checkbox" checked /><span
+                    ><strong>Lifecycle information</strong><br />Copy checklists and governance preparation
+                    responses.</span
+                  ></label
+                >
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelDuplicate" type="button" class="button light" data-permission="none">Cancel</button
+            ><button type="submit" class="button" data-permission="projects.create">Create duplicate</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="archiveModal"
+      class="action-modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="archiveModalTitle"
+    >
+      <div class="action-modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="archiveModalTitle">Archive project</h2>
+            <p id="archiveModalDescription">
+              The project and all linked records will be retained as read-only.
+            </p>
+          </div>
+          <button id="closeArchiveModal" type="button" class="modal-close" aria-label="Close" data-permission="none">&times;</button>
+        </div>
+        <form id="archiveForm">
+          <div class="modal-body">
+            <input id="archiveProjectCode" type="hidden" /><input id="archiveAction" type="hidden" />
+            <div class="modal-field">
+              <label for="archiveReason">Reason <span class="required-mark">*</span></label
+              ><textarea
+                id="archiveReason"
+                required
+                placeholder="Explain why this project is being archived or reopened"
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelArchive" type="button" class="button light" data-permission="none">Cancel</button
+            ><button id="confirmArchive" type="submit" class="button" data-permission="projects.archive">Archive project</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-admin-utils.js?v=2026.08.09.11|ppm-governance-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|index-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+  </body>
+</html>

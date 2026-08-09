@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+    <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+    <script src="ppm-core.js?v=2026.08.09.11"></script>
+    <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+    <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+    <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+    <script src="ppm-change-log.js?v=2026.08.09.11"></script>
+    <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+    <title>Audit History | Foresters Portfolio</title>
+    <link rel="stylesheet" href="audit-history-page.css?v=2026.08.09.11" />
+  </head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Read-only history of changes, approvals and status movements</p>
+    </header>
+    <nav aria-label="Primary navigation">
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html">Registers</a><a href="benefits-management.html">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a
+      ><a class="active" href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div class="page-heading">
+        <div>
+          <h2>Audit History</h2>
+          <p>
+            Review who changed a record, when it changed, which individual cells moved and where in the tool
+            the change was made.
+          </p>
+        </div>
+        <div class="button-row">
+          <button id="clearFilters" class="button light" type="button">Clear filters</button
+          ><button id="exportButton" class="button" type="button">Export filtered CSV</button>
+        </div>
+      </div>
+      <div class="notice">
+        <strong>Verified entries are written by the database</strong> from your authenticated identity, and the
+        application has no privilege to change or delete them. Entries marked legacy come from browser storage
+        recorded before the database migration: they are kept as historical context and are not verifiable.
+        Every row states which it is.
+      </div>
+      <div id="sourceNotice" class="notice" hidden></div>
+      <section class="summary-grid">
+        <div class="summary-card accent">
+          <div class="summary-label">Audit events shown</div>
+          <div id="eventCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Verified by the database</div>
+          <div id="verifiedCount" class="summary-value">0</div>
+          <div id="verifiedNote" class="summary-label">no events shown</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Records affected</div>
+          <div id="recordCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Cells changed</div>
+          <div id="cellCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">People involved</div>
+          <div id="actorCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Latest event</div>
+          <div id="latestEvent" class="summary-value fs-16">No events</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Recorded activity</h3>
+            <p>
+              Filter by project, record type, event type or where the change was made. Record type, event type
+              and location each accept several selections at once.
+            </p>
+          </div>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" type="button" data-view="activity" role="tab">All activity</button>
+          <button class="tab" type="button" data-view="records" role="tab">By record</button>
+        </div>
+        <div class="filters">
+          <div class="field">
+            <label for="searchInput">Search audit history</label
+            ><input
+              id="searchInput"
+              type="search"
+              placeholder="Project, record, action, person or changed value"
+            />
+          </div>
+          <div class="field">
+            <label for="projectFilter">Project</label
+            ><select id="projectFilter">
+              <option value="">All projects</option>
+            </select>
+          </div>
+          <div class="field">
+            <label id="entityFilterLabel">Record type</label>
+            <div class="multi" id="entityFilter" data-placeholder="All record types"></div>
+          </div>
+          <div class="field">
+            <label id="actionFilterLabel">Event type</label>
+            <div class="multi" id="actionFilter" data-placeholder="All event types"></div>
+          </div>
+          <div class="field">
+            <label id="locationFilterLabel">Changed in</label>
+            <div class="multi" id="locationFilter" data-placeholder="Anywhere"></div>
+          </div>
+          <div class="field">
+            <label id="sourceFilterLabel">Evidence</label>
+            <div class="multi" id="sourceFilter" data-placeholder="All sources"></div>
+          </div>
+          <div class="field"><label for="dateFrom">From date</label><input id="dateFrom" type="date" /></div>
+          <div class="field"><label for="dateTo">To date</label><input id="dateTo" type="date" /></div>
+        </div>
+        <div class="table-wrap">
+          <table class="audit-table" id="activityTable">
+            <thead>
+              <tr>
+                <th>Date and time</th>
+                <th>Project</th>
+                <th>Record type</th>
+                <th>Record ID</th>
+                <th>Event</th>
+                <th>What changed</th>
+                <th>Actor</th>
+                <th>Changed in</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="auditBody"></tbody>
+          </table>
+          <table class="audit-table" id="recordsTable" hidden>
+            <thead>
+              <tr>
+                <th>Record type</th>
+                <th>Record ID</th>
+                <th>Record</th>
+                <th>Project</th>
+                <th>Changes</th>
+                <th>Cells changed</th>
+                <th>Last changed</th>
+                <th>Last changed by</th>
+                <th>History</th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty">No audit events match the selected filters.</div>
+      </section>
+    </main>
+
+    <div id="detailModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="detailTitle">Audit event</h3>
+          <p id="detailSummary"></p>
+        </div>
+        <div id="detailBody" class="modal-body"></div>
+        <div class="modal-foot"><button id="closeDetail" class="button" type="button">Close</button></div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-admin-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|audit-history-page.js?v=2026.08.09.11"></script>
+    
+  </body>
+</html>

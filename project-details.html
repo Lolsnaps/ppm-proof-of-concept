@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+    <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+    <script src="ppm-core.js?v=2026.08.09.11"></script>
+    <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+    <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+    <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+    <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+
+    <title>Project Details | PPM Tool</title>
+
+    <link rel="stylesheet" href="project-details-page.css?v=2026.08.09.11" />
+  </head>
+
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+
+    <nav>
+      <a href="index.html"> Projects </a>
+
+      <a href="programme.html"> Programmes </a>
+
+      <a id="milestonesNavigation" href="milestones.html"> Milestones </a>
+
+      <a href="raid-log.html"> RAID Log </a>
+
+      <a href="registers.html"> Registers </a>
+
+      <a href="benefits-management.html"> Benefits </a>
+
+      <a href="resource-directory.html"> Resources </a>
+
+      <a href="resource-management.html"> Resource Management </a>
+
+      <a id="financialNavigation" href="financial-management.html"> Financials </a>
+
+      <a id="auditNavigation" href="audit-history.html"> Audit History </a>
+
+      <a href="#" class="active"> Project Details </a>
+
+      <a href="reports.html"> Reports &amp; Dashboards </a>
+
+      <a href="search.html" class="nav-search" aria-label="Global search">
+        <svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span>
+      </a>
+    </nav>
+
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+
+      <div id="archivedNotice" class="archived-notice" hidden>
+        <strong>Archived project — read-only</strong><span id="archivedNoticeText"></span>
+      </div>
+
+      <div class="page-heading">
+        <div>
+          <h2 id="projectHeading">Project details</h2>
+          <p id="projectReference">Loading project information.</p>
+        </div>
+        <div class="heading-actions">
+          <a id="backButton" href="index.html" class="button light">Back to projects</a>
+          <!--
+            Buttons, not links. Editing happens in the panel below, on this page; there is
+            nothing on another page for these to point at.
+          -->
+          <button id="editProjectButton" type="button" class="button" data-permission="projects.edit">
+            Edit project details
+          </button>
+          <button
+            id="updateStatusButton"
+            type="button"
+            class="button secondary"
+            data-permission="projects.status"
+          >
+            Update project status
+          </button>
+        </div>
+      </div>
+
+      <!--
+        All three project editors render into this panel: the descriptive fields, the status
+        update, and the stage assurance evidence. Built from ppm-project-fields.js by
+        ppm-project-forms.js. Nothing here is fetched from or shared with add-project.html.
+      -->
+      <section id="projectEditorPanel" class="panel project-editor" hidden>
+        <div class="panel-heading">
+          <div>
+            <h3 id="projectEditorTitle">Edit project</h3>
+            <p id="projectEditorDescription"></p>
+          </div>
+          <div class="heading-actions">
+            <span id="projectEditorCount" class="project-reference"></span>
+            <button id="projectEditorCancel" type="button" class="button light" data-permission="none">
+              Cancel
+            </button>
+            <button id="projectEditorSave" type="button" class="button" data-permission="projects.edit">
+              Save changes
+            </button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <p id="projectEditorProblems" class="pf-summary" role="alert"></p>
+          <div id="projectEditorHost"></div>
+        </div>
+      </section>
+
+      <!-- Small facts belong on one line, not in cards of their own. -->
+      <div class="identity-strip">
+        <span class="identity-item"
+          ><span class="identity-label">Status</span><b id="summaryStatus">Not set</b></span
+        >
+        <span class="identity-item"
+          ><span class="identity-label">Stage</span><b id="summaryStage">Not set</b></span
+        >
+        <span class="identity-item"
+          ><span class="identity-label">Complete</span><b id="summaryPercentage">0%</b></span
+        >
+        <span class="identity-item"
+          ><span class="identity-label">Overall RAG</span
+          ><span id="summaryRag" class="rag">Not Assessed</span></span
+        >
+        <span class="identity-spacer"></span>
+        <a id="manageBenefitsButton" href="benefits-management.html" class="identity-link">Benefits</a>
+        <a id="manageFinancialsButton" href="financial-management.html" class="identity-link">Financials</a>
+        <a id="manageStageGatesButton" href="stage-gates.html" class="identity-link">Stage gates</a>
+        <a id="viewAuditButton" href="audit-history.html" class="identity-link">Audit history</a>
+      </div>
+
+      <div class="section-controls">
+        <span class="section-controls-hint">Select any heading to minimise or expand that section.</span>
+        <button id="expandAllSections" type="button" class="button light small" data-permission="none">
+          Expand all
+        </button>
+        <button id="collapseAllSections" type="button" class="button light small" data-permission="none">
+          Collapse all
+        </button>
+      </div>
+
+      <!-- 1. What people came here to read. -->
+      <section class="panel" data-collapsible="status" data-default="open">
+        <div class="panel-heading">
+          <div>
+            <h3>Project status</h3>
+            <p>Where the project is now, what happens next, and what is being done about any slippage.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="status-grid">
+            <div class="status-block">
+              <div class="detail-label">Current position</div>
+              <div id="detailCurrentPosition" class="detail-value narrative"></div>
+            </div>
+            <div class="status-block">
+              <div class="detail-label">Next steps</div>
+              <div id="detailNextSteps" class="detail-value narrative"></div>
+            </div>
+            <div class="status-block">
+              <div class="detail-label">Reason for slippage</div>
+              <div id="detailSlippage" class="detail-value narrative"></div>
+            </div>
+            <div class="status-block">
+              <div class="detail-label">Return-to-green actions</div>
+              <div id="detailReturnToGreen" class="detail-value narrative"></div>
+            </div>
+          </div>
+          <div class="inline-facts">
+            <span><span class="detail-label">Baseline end</span><b id="detailBaselineEnd"></b></span>
+            <span><span class="detail-label">Forecast end</span><b id="detailForecastEnd"></b></span>
+            <span
+              ><span class="detail-label">Delivery confidence</span><b id="detailDeliveryConfidence"></b
+            ></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" data-collapsible="scope" data-default="open">
+        <div class="panel-heading">
+          <div>
+            <h3>Description and scope</h3>
+            <p>What the project is delivering, and what it explicitly is not.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="status-grid">
+            <div class="status-block">
+              <div class="detail-label">Project description</div>
+              <div id="detailDescription" class="detail-value narrative"></div>
+            </div>
+            <div class="status-block">
+              <div class="detail-label">High-level scope</div>
+              <div id="detailScope" class="detail-value narrative"></div>
+            </div>
+            <div class="status-block">
+              <div class="detail-label">Out of scope</div>
+              <div id="detailOutOfScope" class="detail-value narrative"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Who owns it and where it sits. -->
+      <section class="panel" data-collapsible="key-details" data-default="open">
+        <div class="panel-heading">
+          <div>
+            <h3>Key project details</h3>
+            <p>Ownership, priority and lifecycle position.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="fact-grid">
+            <div class="fact">
+              <span class="detail-label">Project code</span><b id="detailProjectCode"></b>
+            </div>
+            <div class="fact">
+              <span class="detail-label">Project manager</span><b id="detailProjectManager"></b>
+            </div>
+            <div class="fact"><span class="detail-label">Sponsor</span><b id="detailSponsor"></b></div>
+            <div class="fact">
+              <span class="detail-label">Project lead</span><b id="detailProjectLead"></b>
+            </div>
+            <div class="fact">
+              <span class="detail-label">Programme / workstream</span><b id="detailWorkstream"></b>
+            </div>
+            <div class="fact"><span class="detail-label">Priority</span><b id="detailPriority"></b></div>
+            <div class="fact">
+              <span class="detail-label">Current stage</span><b id="detailCurrentStage"></b>
+            </div>
+            <div class="fact"><span class="detail-label">Next stage</span><b id="detailNextStage"></b></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Reported RAG only. The calculated assessment sits at the bottom. -->
+      <section class="panel" data-collapsible="reported-rag" data-default="open">
+        <div class="panel-heading">
+          <div>
+            <h3>Reported RAG</h3>
+            <p>The status reported by the project manager for each delivery dimension.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="rag-status-grid">
+            <div class="rag-status-item">
+              <div class="detail-label">Schedule</div>
+              <span id="summaryScheduleRag" class="rag">Not Assessed</span>
+            </div>
+            <div class="rag-status-item">
+              <div class="detail-label">Scope</div>
+              <span id="summaryScopeRag" class="rag">Not Assessed</span>
+            </div>
+            <div class="rag-status-item">
+              <div class="detail-label">Financial</div>
+              <span id="summaryFinancialRag" class="rag">Not Assessed</span>
+            </div>
+            <div class="rag-status-item">
+              <div class="detail-label">Resources</div>
+              <span id="summaryResourceRag" class="rag">Not Assessed</span>
+            </div>
+            <div class="rag-status-item">
+              <div class="detail-label">Risk</div>
+              <span id="summaryRiskRag" class="rag">Not Assessed</span>
+            </div>
+            <div class="rag-status-item">
+              <div class="detail-label">Benefits</div>
+              <span id="summaryBenefitRag" class="rag">Not Assessed</span>
+            </div>
+            <div class="rag-status-item">
+              <div class="detail-label">Quality</div>
+              <span id="summaryQualityRag" class="rag">Not Assessed</span>
+            </div>
+            <div class="rag-status-item">
+              <div class="detail-label">Operational readiness</div>
+              <span id="summaryOperationalReadinessRag" class="rag">Not Assessed</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Supporting detail, minimised by default. -->
+      <section class="panel" data-collapsible="dates" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>Delivery dates</h3>
+            <p>Baseline, forecast and target implementation.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="fact-grid">
+            <div class="fact">
+              <span class="detail-label">Baseline start</span><b id="detailBaselineStart"></b>
+            </div>
+            <div class="fact">
+              <span class="detail-label">Forecast start</span><b id="detailForecastStart"></b>
+            </div>
+            <div class="fact">
+              <span class="detail-label">Target implementation</span><b id="detailImplementationDate"></b>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" data-collapsible="plan" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>Plan and delivery records</h3>
+            <p>Task position and shortcuts to the detailed records for this project.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="inline-facts">
+            <span><span class="detail-label">Total tasks</span><b id="totalTasks">0</b></span>
+            <span><span class="detail-label">Completed</span><b id="completedTasks">0</b></span>
+            <span><span class="detail-label">Slipped</span><b id="slippedTasks">0</b></span>
+            <span><span class="detail-label">Blocked</span><b id="blockedTasks">0</b></span>
+          </div>
+          <div class="quick-link-row">
+            <a id="projectMilestonesLink" href="#" class="quick-link">
+              <span class="quick-link-title">Milestones</span>
+              <span id="projectMilestonesDescription" class="quick-link-description"></span>
+            </a>
+            <a id="projectPlanLink" href="#" class="quick-link">
+              <span class="quick-link-title">Project plan</span>
+              <span id="projectPlanDescription" class="quick-link-description"></span>
+            </a>
+            <a id="projectRaidLink" href="#" class="quick-link">
+              <span class="quick-link-title">RAID register</span>
+              <span id="projectRaidDescription" class="quick-link-description"></span>
+            </a>
+            <a id="projectStageGatesLink" href="#" class="quick-link">
+              <span class="quick-link-title">Stage gates</span>
+              <span class="quick-link-description">Governance evidence and lifecycle decisions.</span>
+            </a>
+            <!-- Buttons: these open an editor on this page, they do not go anywhere. -->
+            <button id="projectEditLink" type="button" class="quick-link" data-permission="projects.edit">
+              <span class="quick-link-title">Edit project details</span>
+              <span class="quick-link-description">Identity, ownership, scope and strategic context.</span>
+            </button>
+            <button id="projectStatusLink" type="button" class="quick-link" data-permission="projects.status">
+              <span class="quick-link-title">Update project status</span>
+              <span class="quick-link-description">Stage, dates, progress, RAG and commentary.</span>
+            </button>
+            <button id="projectAssuranceLink" type="button" class="quick-link" data-permission="projects.edit">
+              <span class="quick-link-title">Lifecycle assurance evidence</span>
+              <span class="quick-link-description">What each stage gate expects, grouped by stage.</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" data-collapsible="raid" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>RAID</h3>
+            <p>Risks, assumptions, issues and dependencies linked to this project.</p>
+          </div>
+          <a id="manageRaidButton" href="raid-log.html" class="button raid-button">Manage RAID</a>
+        </div>
+        <div class="panel-body">
+          <div id="raidList" class="raid-list"></div>
+          <div id="emptyRaidMessage" class="empty-message">No RAID items are linked to this project ID.</div>
+        </div>
+      </section>
+
+      <section class="panel" data-collapsible="stage-gates" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>Formal stage gates</h3>
+            <p>Latest submission, independent approval and lifecycle decision.</p>
+          </div>
+          <a id="stageGatePanelLink" href="stage-gates.html" class="button light">Open stage gates</a>
+        </div>
+        <div class="panel-body" id="stageGateSummary"></div>
+      </section>
+
+      <section class="panel" data-collapsible="lifecycle" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>Lifecycle readiness</h3>
+            <p>Mandatory information required for the current lifecycle stage.</p>
+          </div>
+          <button id="editAssuranceButton" type="button" class="button light" data-permission="projects.edit">
+            Edit assurance evidence
+          </button>
+        </div>
+        <div class="panel-body" id="lifecycleReadinessDetail"></div>
+      </section>
+
+      <section class="panel" data-collapsible="documents" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>Collateral library</h3>
+            <p>Links to project documents and folders held in Teams or SharePoint.</p>
+          </div>
+          <button id="addDocumentButton" type="button" class="button" data-permission="projects.edit">
+            Add document link
+          </button>
+        </div>
+        <div class="panel-body">
+          <div id="documentList" class="document-list"></div>
+          <div id="emptyDocumentMessage" class="empty-message">
+            No document links have been added for this project.
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" data-collapsible="extended" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>Extended project information</h3>
+            <p>Identification, delivery ownership, strategic drivers, approvals and actual dates.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="extendedProjectInformation" class="extended-sections"></div>
+        </div>
+      </section>
+
+      <!-- 5. Evidence-based assessment, kept out of the way at the bottom. -->
+      <section class="panel" data-collapsible="calculated-rag" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>Calculated RAG assessment</h3>
+            <p>
+              Derived from plan, milestone, financial and resource data. Shown here for comparison — the
+              reported RAG above is what the project manager is accountable for.
+            </p>
+          </div>
+          <span class="identity-item"
+            ><span class="identity-label">Calculated overall</span
+            ><span id="summaryCalculatedRag" class="rag">Not Assessed</span></span
+          >
+        </div>
+        <div class="panel-body" id="calculatedRagDetail"></div>
+      </section>
+
+      <section class="panel" data-collapsible="rag-history" data-default="closed">
+        <div class="panel-heading">
+          <div>
+            <h3>RAG reporting history</h3>
+            <p>Status changes and justified overrides retained for governance and trend reporting.</p>
+          </div>
+        </div>
+        <div class="panel-body"><div id="ragHistory"></div></div>
+      </section>
+    </main>
+
+    <div
+      id="documentModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="documentModalTitle"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h2 id="documentModalTitle">Add document link</h2>
+
+          <button id="closeDocumentModalButton" type="button" class="close-button" aria-label="Close">
+            &times;
+          </button>
+        </div>
+
+        <form id="documentForm">
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="documentType">
+                  Document type
+                  <span class="required">*</span>
+                </label>
+
+                <select id="documentType" required>
+                  <option value="">Select a document type</option>
+
+                  <option value="Collateral Library">Collateral Library</option>
+
+                  <option value="Project Profile">Project Profile</option>
+
+                  <option value="Business Case">Business Case</option>
+
+                  <option value="Requirements">Requirements</option>
+
+                  <option value="Solution Design">Solution Design</option>
+
+                  <option value="Stage-Gate">Stage-Gate</option>
+
+                  <option value="RAID Log">RAID Log</option>
+
+                  <option value="Test Evidence">Test Evidence</option>
+
+                  <option value="Implementation">Implementation</option>
+
+                  <option value="Closure">Closure</option>
+
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="documentName">
+                  Link name
+                  <span class="required">*</span>
+                </label>
+
+                <input
+                  id="documentName"
+                  type="text"
+                  maxlength="200"
+                  required
+                  placeholder="For example, Project Collateral Library"
+                />
+              </div>
+
+              <div class="form-field full-width">
+                <label for="documentUrl">
+                  Teams or SharePoint link
+                  <span class="required">*</span>
+                </label>
+
+                <input
+                  id="documentUrl"
+                  type="url"
+                  required
+                  placeholder="Paste the full Teams or SharePoint link"
+                />
+
+                <p class="help-text">
+                  Paste the link copied from Teams or SharePoint. Access remains controlled by the permissions
+                  on the source document or folder.
+                </p>
+              </div>
+
+              <div class="form-field full-width">
+                <label for="documentNotes"> Notes </label>
+
+                <textarea
+                  id="documentNotes"
+                  maxlength="1000"
+                  placeholder="Add any useful information about this link"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button id="cancelDocumentButton" type="button" class="button secondary">Cancel</button>
+
+            <button id="saveDocumentButton" type="submit" class="button" data-permission="projects.edit">
+              Save link
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="deleteDocumentConfirmation"
+      class="confirmation-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteDocumentTitle"
+      aria-describedby="deleteDocumentMessage"
+    >
+      <div class="confirmation-bubble">
+        <h2 id="deleteDocumentTitle">Delete document link?</h2>
+        <p id="deleteDocumentMessage"></p>
+        <div class="confirmation-actions">
+          <button id="cancelDeleteDocumentButton" type="button" class="button light" data-permission="none">
+            Keep link
+          </button>
+          <button
+            id="confirmDeleteDocumentButton"
+            type="button"
+            class="button danger"
+            data-permission="projects.edit"
+          >
+            Delete link
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|ppm-governance-utils.js?v=2026.08.09.11|ppm-planning-utils.js?v=2026.08.09.11|ppm-stage-gate-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|ppm-project-fields.js?v=2026.08.09.11|ppm-project-forms.js?v=2026.08.09.11|project-details-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+    
+  </body>
+</html>

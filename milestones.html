@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Milestones | PPM Tool</title>
+  <link rel="stylesheet" href="milestones-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+
+    <nav>
+      <a href="index.html">Projects</a>
+      <a href="programme.html">Programmes</a>
+      <a href="milestones.html" class="active">Milestones</a>
+      <a id="raidNavigation" href="raid-log.html">RAID Log</a>
+      <a href="registers.html">Registers</a>
+      <a href="benefits-management.html">Benefits</a>
+      <a href="resource-directory.html">Resources</a>
+      <a href="resource-management.html">Resource Management</a>
+      <a href="financial-management.html">Financials</a>
+      <a href="audit-history.html">Audit History</a>
+      <a href="reports.html">Reports &amp; Dashboards</a>
+      <a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+
+      <div class="page-heading">
+        <div>
+          <h2 id="pageTitle">Project milestones</h2>
+          <p id="pageDescription">Select a project to maintain its delivery milestones.</p>
+        </div>
+        <div class="heading-actions">
+          <a id="projectDetailsButton" href="index.html" class="button light">Back to projects</a>
+          <button id="saveMilestonesButton" type="button" class="button" disabled data-permission="milestones.edit">Saved</button>
+          <button id="addMilestoneButton" type="button" class="button" disabled data-permission="milestones.edit">Add milestone row</button>
+        </div>
+      </div>
+
+      <section class="project-selector">
+        <div>
+          <label for="projectSelector">Project</label>
+          <select id="projectSelector">
+            <option value="">Select a project</option>
+          </select>
+        </div>
+        <div id="projectContext" class="project-context">
+          Choose a project to view its milestone schedule.
+        </div>
+      </section>
+
+      <section class="summary-grid" aria-label="Milestone summary">
+        <div class="summary-card">
+          <div class="summary-label">Total milestones</div>
+          <div id="totalMilestones" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Complete</div>
+          <div id="completeMilestones" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">In progress</div>
+          <div id="inProgressMilestones" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Overdue</div>
+          <div id="overdueMilestones" class="summary-value">0</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Delivery milestones</h3>
+            <p>
+              Edit cells directly, add new rows in the grid, then select Save changes. Status is calculated
+              automatically. Formal lifecycle gates, evidence and approvals are maintained on the
+              <a id="stageGatesLink" href="stage-gates.html">Stage Gates</a> page.
+            </p>
+          </div>
+          <span id="milestoneUnsavedIndicator" class="unsaved-indicator" aria-live="polite"
+            >All changes saved</span
+          >
+        </div>
+        <div class="filter-row">
+          <input
+            id="milestoneSearch"
+            type="search"
+            placeholder="Search milestones"
+            aria-label="Search milestones"
+          />
+          <select id="milestoneStatusFilter" aria-label="Filter milestones by status">
+            <option value="">All statuses</option>
+            <option value="Not Started">Not Started</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Overdue">Overdue</option>
+            <option value="Complete">Complete</option>
+          </select>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Milestone</th>
+                <th>Baseline start</th>
+                <th>Baseline finish</th>
+                <th>Forecast start</th>
+                <th>Forecast finish</th>
+                <th>Complete</th>
+                <th>Status</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="milestoneTableBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyMilestoneMessage" class="empty-message">
+          Select a project, then add its first milestone row.
+        </div>
+      </section>
+    </main>
+
+    <div
+      id="milestoneModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="milestoneModalTitle"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="milestoneModalTitle">Add milestone</h2>
+            <p>Record the approved baseline and current forecast for this delivery milestone.</p>
+          </div>
+          <button id="closeMilestoneModalButton" type="button" class="close-button" aria-label="Close" data-permission="none">
+            &times;
+          </button>
+        </div>
+        <form id="milestoneForm">
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-field full-width">
+                <label for="milestoneName">Milestone name <span class="required">*</span></label>
+                <input
+                  id="milestoneName"
+                  type="text"
+                  list="milestoneSuggestions"
+                  maxlength="200"
+                  required
+                  placeholder="For example, Supplier contract signed"
+                />
+                <datalist id="milestoneSuggestions">
+                  <option value="Requirements signed off"></option>
+                  <option value="Supplier contract signed"></option>
+                  <option value="Development complete"></option>
+                  <option value="System testing complete"></option>
+                  <option value="User acceptance testing complete"></option>
+                  <option value="Migration complete"></option>
+                  <option value="Go-live"></option>
+                  <option value="Benefits realised"></option>
+                </datalist>
+              </div>
+              <div class="form-field">
+                <label for="milestonePercentage">Percentage complete <span class="required">*</span></label>
+                <input id="milestonePercentage" type="number" min="0" max="100" step="1" value="0" required />
+              </div>
+              <div class="form-field">
+                <label for="baselineStartDate">Baseline start date <span class="required">*</span></label>
+                <input id="baselineStartDate" type="date" required />
+              </div>
+              <div class="form-field">
+                <label for="baselineFinishDate">Baseline finish date <span class="required">*</span></label>
+                <input id="baselineFinishDate" type="date" required />
+              </div>
+              <div class="form-field">
+                <label for="forecastStartDate">Forecast start date <span class="required">*</span></label>
+                <input id="forecastStartDate" type="date" required />
+              </div>
+              <div class="form-field">
+                <label for="forecastFinishDate">Forecast finish date <span class="required">*</span></label>
+                <input id="forecastFinishDate" type="date" required />
+              </div>
+              <div class="form-field full-width">
+                <label>Calculated status</label>
+                <span id="milestoneStatusPreview" class="badge status-preview">Not Started</span>
+                <p class="help-text">
+                  Incomplete milestones become Overdue when the forecast moves beyond the baseline, or when
+                  the forecast finish date has passed.
+                </p>
+              </div>
+              <div class="form-field full-width">
+                <label for="milestoneNotes">Notes</label>
+                <textarea
+                  id="milestoneNotes"
+                  maxlength="2000"
+                  placeholder="Add delivery notes or dependencies for this milestone"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelMilestoneButton" type="button" class="button secondary" data-permission="none">Cancel</button>
+            <button type="submit" class="button" data-permission="milestones.edit">Save milestone</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="deleteMilestoneConfirmation"
+      class="confirmation-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteMilestoneTitle"
+      aria-describedby="deleteMilestoneMessage"
+    >
+      <div class="confirmation-bubble">
+        <h2 id="deleteMilestoneTitle">Delete milestone row?</h2>
+        <p id="deleteMilestoneMessage">This milestone will be removed when you save your changes.</p>
+        <div class="confirmation-actions">
+          <button id="cancelDeleteMilestoneButton" type="button" class="button light" data-permission="none">Keep milestone</button>
+          <button id="confirmDeleteMilestoneButton" type="button" class="button danger" data-permission="milestones.edit">
+            Delete milestone
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-governance-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|milestones-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+  </body>
+</html>

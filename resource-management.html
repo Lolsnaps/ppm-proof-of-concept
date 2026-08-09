@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Resource Management | PPM Tool</title>
+  <link rel="stylesheet" href="resource-management-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+
+    <nav>
+      <a href="index.html">Projects</a>
+      <a href="programme.html">Programmes</a>
+      <a href="milestones.html">Milestones</a>
+      <a href="raid-log.html">RAID Log</a>
+      <a href="registers.html">Registers</a>
+      <a href="benefits-management.html">Benefits</a>
+      <a href="resource-directory.html">Resources</a>
+      <a href="resource-management.html" class="active">Resource Management</a>
+      <a href="financial-management.html">Financials</a>
+      <a href="audit-history.html">Audit History</a>
+      <a href="reports.html">Reports &amp; Dashboards</a>
+      <a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div class="page-heading">
+        <div>
+          <h2>Resource management</h2>
+          <p>
+            View Project Plan assignments by person, team or role. Resource rows show total allocation by
+            period; task rows beneath show the task and linked project across the forecast timeline.
+          </p>
+        </div>
+        <a href="resource-directory.html" class="button light">Resource directory</a>
+      </div>
+
+      <section class="summary-grid" aria-label="Resource allocation summary">
+        <div class="summary-card">
+          <div class="summary-label">Resources displayed</div>
+          <div id="displayedResources" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Scheduled tasks</div>
+          <div id="scheduledTasks" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Overallocated resources</div>
+          <div id="overallocatedResources" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Tasks affected by absence</div>
+          <div id="absenceConflicts" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Unscheduled / unassigned tasks</div>
+          <div id="unassignedTasks" class="summary-value">0</div>
+        </div>
+      </section>
+
+      <section class="control-panel" aria-label="Resource view controls">
+        <div class="control-grid">
+          <div class="control-field">
+            <label>Zoom</label>
+            <div class="zoom-buttons" role="group" aria-label="Timeline zoom">
+              <button type="button" class="zoom-button active" data-zoom="week" aria-pressed="true">
+                Week
+              </button>
+              <button type="button" class="zoom-button" data-zoom="month" aria-pressed="false">Month</button>
+              <button type="button" class="zoom-button" data-zoom="quarter" aria-pressed="false">
+                Quarter
+              </button>
+              <button type="button" class="zoom-button" data-zoom="year" aria-pressed="false">Year</button>
+            </div>
+          </div>
+          <div class="control-field">
+            <label for="groupBy">Group by</label>
+            <select id="groupBy">
+              <option value="team">Team</option>
+              <option value="role">Role / job title</option>
+              <option value="resource">Resource only</option>
+            </select>
+          </div>
+          <div class="control-field">
+            <label for="teamFilter">Team</label>
+            <select id="teamFilter">
+              <option value="">All teams</option>
+            </select>
+          </div>
+          <div class="control-field">
+            <label for="roleFilter">Role / job title</label>
+            <select id="roleFilter">
+              <option value="">All roles</option>
+            </select>
+          </div>
+          <div class="control-field">
+            <label for="taskSearch">Task or project</label>
+            <input id="taskSearch" type="search" placeholder="Search assignments" />
+          </div>
+        </div>
+
+        <div class="view-row">
+          <select id="savedViewSelector" aria-label="Saved resource views">
+            <option value="">Current unsaved view</option>
+          </select>
+          <input id="viewName" type="text" maxlength="80" placeholder="Name this view" />
+          <select id="viewScope" aria-label="Saved view visibility">
+            <option value="personal">Personal view</option>
+            <option value="shared">Shared / published view</option>
+          </select>
+          <button id="saveViewButton" type="button" class="button" data-permission="none">Save view</button>
+          <button id="deleteViewButton" type="button" class="button danger" disabled data-permission="none">Delete view</button>
+        </div>
+
+        <details class="column-picker">
+          <summary>Choose visible allocation columns</summary>
+          <div id="resourceColumnOptions" class="column-options"></div>
+        </details>
+
+        <details class="resource-picker">
+          <summary id="resourcePickerSummary">Choose resources</summary>
+          <div class="resource-picker-actions">
+            <button id="selectAllResources" type="button" class="button light small">Select all</button>
+            <button id="clearResources" type="button" class="button light small">Clear</button>
+          </div>
+          <div id="resourceOptions" class="resource-options"></div>
+        </details>
+      </section>
+
+      <section class="gantt-panel">
+        <div class="gantt-toolbar">
+          <div>
+            <h3>Allocation Gantt</h3>
+            <div id="timelineRange" class="resource-meta"></div>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-swatch allocated"></span>Allocated</span>
+            <span class="legend-item"><span class="legend-swatch full"></span>100%</span>
+            <span class="legend-item"><span class="legend-swatch over"></span>Overallocated</span>
+            <span class="legend-item"><span class="legend-swatch unavailable"></span>Unavailable</span>
+            <button id="todayButton" type="button" class="button light small">Go to today</button>
+            <button
+              id="expandGanttButton"
+              type="button"
+              class="button light small"
+              aria-pressed="false"
+              title="Expand the allocation Gantt to fill the browser window"
+            >
+              ⛶ Expand Gantt
+            </button>
+          </div>
+        </div>
+        <div id="ganttScroll" class="gantt-scroll">
+          <div id="ganttContent" class="gantt-content"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-planning-utils.js?v=2026.08.09.11|resource-management-page.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|ppm-resource-management-features.js?v=2026.08.09.11"></script>
+    
+    
+    <link rel="stylesheet" href="ppm-resource-management-features.css?v=2026.08.09.11" />
+    
+    
+    
+  </body>
+</html>

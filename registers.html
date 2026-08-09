@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Source Registers | Foresters Portfolio</title>
+  <link rel="stylesheet" href="registers-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Project, programme and portfolio management</p>
+    </header>
+    <nav>
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html" class="active">Registers</a><a href="benefits-management.html">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div class="page-heading">
+        <div>
+          <h2>Source registers</h2>
+          <p>
+            Maintain governed action, decision, financial, document and formal status information used by
+            dashboards and reports. Benefits have their own management page.
+          </p>
+        </div>
+        <div class="heading-actions">
+          <a href="benefits-management.html" class="button light">Manage benefits</a
+          ><button id="saveChangesButton" type="button" class="button" disabled data-permission="registers.edit">Saved</button
+          ><button id="addRowButton" type="button" class="button light" data-permission="registers.edit">Add row</button>
+        </div>
+      </div>
+
+      <div id="registerTabs" class="tabs" role="tablist" aria-label="Source registers"></div>
+
+      <section class="relationship-guide" aria-label="How RAID, actions and decisions relate">
+        <div>
+          <h3>RAID, actions and decisions</h3>
+          <p>
+            These records can be linked, but each answers a different governance question and retains its own
+            history.
+          </p>
+        </div>
+        <div>
+          <h3>RAID Log</h3>
+          <p>
+            <strong>What could affect delivery?</strong> Risks, assumptions, active issues and dependencies
+            are assessed and monitored in the RAID Log.
+          </p>
+        </div>
+        <div>
+          <h3>Action Register</h3>
+          <p>
+            <strong>What must someone do?</strong> A committed follow-up has an accountable owner, due date,
+            evidence and escalation status.
+          </p>
+        </div>
+        <div>
+          <h3>Decision Register</h3>
+          <p>
+            <strong>What choice or approval is required?</strong> Options, recommendation, authority, outcome
+            and rationale form the decision audit trail.
+          </p>
+        </div>
+      </section>
+
+      <section class="summary-grid" aria-label="Register summary">
+        <div class="summary-card">
+          <div class="summary-label">Rows in register</div>
+          <div id="totalRows" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Projects represented</div>
+          <div id="linkedProjects" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Open / active rows</div>
+          <div id="openRows" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Overdue review or due date</div>
+          <div id="overdueRows" class="summary-value">0</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3 id="registerTitle">Register</h3>
+            <p id="registerDescription"></p>
+          </div>
+          <span id="unsavedIndicator" class="unsaved" aria-live="polite">All changes saved</span>
+        </div>
+        <div class="filters">
+          <input
+            id="registerSearch"
+            type="search"
+            placeholder="Search this register"
+            aria-label="Search this register"
+          /><select id="projectFilter" aria-label="Filter by project">
+            <option value="">All projects</option></select
+          ><select id="statusFilter" aria-label="Filter by status">
+            <option value="">All statuses</option>
+          </select>
+        </div>
+        <div class="table-wrapper">
+          <table id="registerTable" class="register-table">
+            <thead id="registerHead"></thead>
+            <tbody id="registerBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state">No rows match the selected filters.</div>
+      </section>
+    </main>
+
+    <div
+      id="deleteConfirmation"
+      class="confirmation-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteTitle"
+      aria-describedby="deleteMessage"
+    >
+      <div class="confirmation-bubble">
+        <h2 id="deleteTitle">Delete row?</h2>
+        <p id="deleteMessage"></p>
+        <div class="confirmation-actions">
+          <button id="cancelDeleteButton" type="button" class="button light" data-permission="none">Keep row</button
+          ><button id="confirmDeleteButton" type="button" class="button danger" data-permission="registers.edit">Delete row</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|ppm-register-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|registers-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+  </body>
+</html>

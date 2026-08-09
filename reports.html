@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Reports &amp; Dashboards | Foresters Portfolio</title>
+  <link rel="stylesheet" href="reports-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Project, programme and portfolio performance</p>
+    </header>
+    <nav>
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html">Registers</a><a href="benefits-management.html">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html" class="active">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div class="page-heading">
+        <div>
+          <h2>Reports &amp; dashboards</h2>
+          <p>
+            Review portfolio health, delivery performance, resource pressure and the decisions that need
+            attention.
+          </p>
+        </div>
+        <div class="heading-actions">
+          <span class="classification">Internal</span
+          ><button id="refreshDataButton" type="button" class="button light">Refresh data</button>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Dashboard sections">
+        <button
+          type="button"
+          class="tab-button active"
+          data-pane="portfolioPane"
+          role="tab"
+          aria-selected="true"
+        >
+          Portfolio dashboard
+        </button>
+        <button type="button" class="tab-button" data-pane="personalPane" role="tab" aria-selected="false">
+          My home page
+        </button>
+        <button type="button" class="tab-button" data-pane="projectPane" role="tab" aria-selected="false">
+          Project dashboard
+        </button>
+        <button type="button" class="tab-button" data-pane="reportsPane" role="tab" aria-selected="false">
+          Standard reports
+        </button>
+      </div>
+
+      <section class="panel filters" aria-label="Report filters">
+        <div class="panel-heading">
+          <div>
+            <h3>Filters</h3>
+            <p>
+              Focus the dashboards and reports on the projects, teams and reporting period you want to review.
+            </p>
+          </div>
+          <button id="clearFiltersButton" type="button" class="button light">Clear filters</button>
+        </div>
+        <div class="filter-primary">
+          <div class="filter-field">
+            <label for="projectFilter">Project</label
+            ><select id="projectFilter">
+              <option value="">All projects</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="workstreamFilter">Workstream</label
+            ><select id="workstreamFilter">
+              <option value="">All workstreams</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="managerFilter">Project manager</label
+            ><select id="managerFilter">
+              <option value="">All managers</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="ragFilter">Overall RAG</label
+            ><select id="ragFilter">
+              <option value="">All overall RAG statuses</option>
+              <option>Red</option>
+              <option>Amber</option>
+              <option>Green</option>
+              <option>Not Assessed</option>
+            </select>
+          </div>
+        </div>
+        <details class="filters">
+          <summary class="panel-inset">More filters</summary>
+          <div class="filter-advanced">
+            <div class="filter-field">
+              <label for="portfolioFilter">Portfolio</label
+              ><select id="portfolioFilter">
+                <option value="">All portfolios</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="programmeFilter">Programme</label
+              ><select id="programmeFilter">
+                <option value="">All programmes</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="sponsorFilter">Sponsor</label
+              ><select id="sponsorFilter">
+                <option value="">All sponsors</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="leadFilter">Lead</label
+              ><select id="leadFilter">
+                <option value="">All leads</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="stageFilter">Lifecycle stage</label
+              ><select id="stageFilter">
+                <option value="">All stages</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="statusFilter">Portfolio status</label
+              ><select id="statusFilter">
+                <option value="">All statuses</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="priorityFilter">Priority</label
+              ><select id="priorityFilter">
+                <option value="">All priorities</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="businessAreaFilter">Business area</label
+              ><select id="businessAreaFilter">
+                <option value="">All business areas</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="resourceTeamFilter">Resource team</label
+              ><select id="resourceTeamFilter">
+                <option value="">All resource teams</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="riskRatingFilter">Risk rating</label
+              ><select id="riskRatingFilter">
+                <option value="">All risk ratings</option>
+                <option>Critical</option>
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="benefitTypeFilter">Benefit type</label
+              ><select id="benefitTypeFilter">
+                <option value="">All benefit types</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="dateFromFilter">Date from</label><input id="dateFromFilter" type="date" />
+            </div>
+            <div class="filter-field">
+              <label for="dateToFilter">Date to</label><input id="dateToFilter" type="date" />
+            </div>
+            <div class="filter-field">
+              <label for="projectSort">Project sorting</label
+              ><select id="projectSort">
+                <option value="name">Project name</option>
+                <option value="rag">RAG</option>
+                <option value="forecast">Forecast end</option>
+                <option value="priority">Priority</option>
+                <option value="complete">Percentage complete</option>
+              </select>
+            </div>
+            <div class="filter-field">
+              <label for="includeArchived">Archived projects</label
+              ><select id="includeArchived">
+                <option value="no">Exclude archived</option>
+                <option value="yes">Include archived</option>
+              </select>
+            </div>
+          </div>
+        </details>
+        <div class="saved-view-row">
+          <div class="saved-view-controls">
+            <select id="savedViewSelector" aria-label="Saved report views">
+              <option value="">Current unsaved view</option>
+            </select>
+            <input
+              id="savedViewName"
+              type="text"
+              maxlength="80"
+              placeholder="Name this view"
+              aria-label="Name this view"
+            />
+            <select id="savedViewScope" aria-label="Saved view visibility">
+              <option value="personal">Personal view</option>
+              <option value="shared">Shared / published view</option>
+            </select>
+            <button id="saveViewButton" type="button" class="button" data-permission="reports.view">Save view</button>
+            <button id="deleteViewButton" type="button" class="button light" disabled data-permission="reports.view">Delete</button>
+          </div>
+          <div id="filterSummary" class="metric-detail">No filters applied</div>
+        </div>
+      </section>
+
+      <section id="portfolioPane" class="pane">
+        <div class="section-title">
+          <h3>Portfolio overview</h3>
+          <p>The headline position for the projects currently included in your view.</p>
+        </div>
+        <div id="portfolioMetrics" class="metric-grid"></div>
+        <div class="dashboard-grid">
+          <div class="chart-card">
+            <h3>Projects by status</h3>
+            <div id="statusChart" class="bar-list"></div>
+          </div>
+          <div class="chart-card">
+            <h3>Projects by overall RAG</h3>
+            <div id="ragChart" class="bar-list"></div>
+          </div>
+          <div class="chart-card">
+            <h3>Projects by lifecycle stage</h3>
+            <div id="stageChart" class="bar-list"></div>
+          </div>
+          <div class="chart-card">
+            <h3>Projects by workstream</h3>
+            <div id="workstreamChart" class="bar-list"></div>
+          </div>
+          <div class="chart-card">
+            <h3>Projects by portfolio</h3>
+            <div id="portfolioChart" class="bar-list"></div>
+          </div>
+          <div class="chart-card">
+            <h3>Projects by programme</h3>
+            <div id="programmeChart" class="bar-list"></div>
+          </div>
+        </div>
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3 id="portfolioListTitle">Projects</h3>
+              <p id="portfolioListDescription">
+                Select a project to review its full status, plan, milestones and RAID items.
+              </p>
+            </div>
+            <button id="clearMetricButton" type="button" class="button light" disabled>
+              Show all projects
+            </button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Project</th>
+                  <th>Portfolio</th>
+                  <th>Workstream</th>
+                  <th>Manager</th>
+                  <th>Status</th>
+                  <th>Overall RAG</th>
+                  <th>Stage</th>
+                  <th>Baseline end</th>
+                  <th>Forecast end</th>
+                  <th>Complete</th>
+                  <th>Exceptions</th>
+                </tr>
+              </thead>
+              <tbody id="portfolioProjectRows"></tbody>
+            </table>
+          </div>
+          <div id="metricDetailPanel" class="dashboard-section" hidden></div>
+        </section>
+        <div class="dashboard-grid">
+          <section class="panel m-0">
+            <div class="panel-heading">
+              <div>
+                <h3>Portfolio roadmap</h3>
+                <p>See when projects and key milestones are expected to be delivered.</p>
+              </div>
+            </div>
+            <div id="roadmapContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading">
+              <div>
+                <h3>Key risks and dependencies</h3>
+                <p>The most significant open risks and dependencies requiring portfolio attention.</p>
+              </div>
+            </div>
+            <div id="keyRaidContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading">
+              <div>
+                <h3>Portfolio financial position</h3>
+                <p>Review the financial health of projects within your current view.</p>
+              </div>
+            </div>
+            <div id="portfolioFinancialContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading">
+              <div>
+                <h3>Benefit realisation position</h3>
+                <p>Track whether expected benefits are on course to be realised.</p>
+              </div>
+            </div>
+            <div id="portfolioBenefitsContent" class="dashboard-section"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="personalPane" class="pane" hidden>
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>My home page</h3>
+              <p>Choose a colleague to review their projects, tasks, actions and upcoming deadlines.</p>
+            </div>
+          </div>
+          <div class="dashboard-section">
+            <div class="control-field xw-420">
+              <label for="personalUserSelect">View workload for</label
+              ><select id="personalUserSelect"></select>
+            </div>
+          </div>
+        </section>
+        <div id="personalMetrics" class="metric-grid"></div>
+        <div class="dashboard-grid">
+          <section class="panel m-0">
+            <div class="panel-heading"><h3>My projects</h3></div>
+            <div id="myProjectsContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading"><h3>My tasks and overdue items</h3></div>
+            <div id="myTasksContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading"><h3>Upcoming stage gates</h3></div>
+            <div id="myMilestonesContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading"><h3>My actions and approvals</h3></div>
+            <div id="myActionsContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading"><h3>Reports due and notifications</h3></div>
+            <div id="myNotificationsContent" class="dashboard-section"></div>
+          </section>
+          <section class="panel m-0">
+            <div class="panel-heading"><h3>Recently updated projects</h3></div>
+            <div id="myRecentProjectsContent" class="dashboard-section"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="projectPane" class="pane" hidden>
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Project dashboard</h3>
+              <p>
+                Review project health, progress, delivery concerns and the next items requiring attention.
+              </p>
+            </div>
+            <div class="control-field mw-320">
+              <label for="projectDashboardSelect">Project</label
+              ><select id="projectDashboardSelect"></select>
+            </div>
+          </div>
+          <div id="projectDashboardContent" class="dashboard-section"></div>
+        </section>
+      </section>
+
+      <section id="reportsPane" class="pane" hidden>
+        <section class="panel">
+          <div class="report-controls">
+            <div class="control-field">
+              <label for="reportSelector">Standard report</label
+              ><select id="reportSelector"></select>
+            </div>
+            <div class="control-field">
+              <label for="reportGroup">Group by</label
+              ><select id="reportGroup">
+                <option value="">No grouping</option>
+              </select>
+            </div>
+            <div class="control-field">
+              <label for="reportSort">Sort by</label
+              ><select id="reportSort"></select>
+            </div>
+            <div class="control-field">
+              <label for="reportSortDirection">Direction</label
+              ><select id="reportSortDirection">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+          </div>
+          <div class="report-intro">
+            <div class="panel-heading flush">
+              <div>
+                <h3 id="reportTitle">Report</h3>
+                <p id="reportDescription"></p>
+              </div>
+              <div class="toolbar-actions">
+                <button id="exportCsvButton" type="button" class="button light">Export CSV</button
+                ><button id="exportExcelButton" type="button" class="button light">Export Excel</button
+                ><button id="exportWordButton" type="button" class="button light">Export Word pack</button
+                ><button id="exportPowerPointButton" type="button" class="button light">
+                  Export PowerPoint pack</button
+                ><button id="printViewButton" type="button" class="button light">Print view</button
+                ><button id="exportPdfButton" type="button" class="button">Export PDF</button>
+              </div>
+            </div>
+            <div class="report-meta">
+              <span id="reportGenerated"></span><span id="reportAppliedFilters"></span
+              ><span>Classification: Internal</span>
+            </div>
+            <details class="column-picker">
+              <summary>Choose visible columns</summary>
+              <div id="columnOptions" class="column-options"></div>
+            </details>
+          </div>
+          <div id="reportGap" class="data-gap is-hidden report-gap"></div>
+          <div class="table-wrapper">
+            <table>
+              <thead id="reportTableHead"></thead>
+              <tbody id="reportTableBody"></tbody>
+            </table>
+          </div>
+          <div id="reportEmpty" class="empty-state is-hidden"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|ppm-planning-utils.js?v=2026.08.09.11|ppm-stage-gate-utils.js?v=2026.08.09.11|pdfmake.min.js|vfs_fonts.js|ppm-report-pdf.js?v=2026.08.09.11|reports-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+    
+    
+  </body>
+</html>

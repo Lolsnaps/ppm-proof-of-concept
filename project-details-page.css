@@ -1,0 +1,1368 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f1f5f9;
+  color: #172033;
+}
+
+header {
+  padding: 22px 30px;
+  background: #172554;
+  color: white;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+header p {
+  margin: 6px 0 0;
+  color: #cbd5e1;
+}
+
+nav {
+  display: flex;
+  gap: 6px;
+  padding: 0 30px;
+  background: white;
+  border-bottom: 1px solid #dbe2ea;
+}
+
+nav a,
+nav button {
+  padding: 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #475569;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+nav a:hover,
+nav a.active {
+  color: #1d4ed8;
+  border-bottom-color: #1d4ed8;
+}
+
+nav button:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+main {
+  max-width: 1350px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+.message {
+  display: none;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.message.success {
+  display: block;
+  border: 1px solid #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.message.error {
+  display: block;
+  border: 1px solid #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.page-heading h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.page-heading p {
+  margin: 8px 0 0;
+  color: #64748b;
+}
+
+.heading-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.button {
+  display: inline-block;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 7px;
+  background: #2563eb;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #1d4ed8;
+}
+
+.button.plan-button {
+  background: #0f766e;
+}
+
+.button.plan-button:hover {
+  background: #115e59;
+}
+
+.button.raid-button {
+  background: #7c3aed;
+}
+
+.button.raid-button:hover {
+  background: #6d28d9;
+}
+
+.button.secondary {
+  background: #64748b;
+}
+
+.button.secondary:hover {
+  background: #475569;
+}
+
+.button.light {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+}
+
+.button.light:hover {
+  background: #f8fafc;
+}
+
+.button.danger {
+  background: #b91c1c;
+}
+
+.button.danger:hover {
+  background: #991b1b;
+}
+
+.button.small {
+  padding: 7px 11px;
+  font-size: 12px;
+}
+
+.project-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.05);
+}
+
+.summary-label {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.summary-value {
+  margin-top: 7px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.rag {
+  display: inline-block;
+  min-width: 95px;
+  padding: 6px 11px;
+  border-radius: 18px;
+  background: #e2e8f0;
+  color: #475569;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rag-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.rag-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rag-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.message.warning {
+  display: block;
+  border: 1px solid #fbbf24;
+  background: #fef3c7;
+  color: #92400e;
+}
+.archived-notice {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid #cbd5e1;
+  border-left: 5px solid #64748b;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #475569;
+  line-height: 1.5;
+}
+.archived-notice strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #172033;
+}
+.extended-sections {
+  display: grid;
+  gap: 14px;
+}
+.extended-section {
+  padding: 16px;
+  border: 1px solid #dbe3ef;
+  border-radius: 9px;
+  background: #fbfcfe;
+}
+.extended-section h4 {
+  margin: 0 0 12px;
+  color: #3f1937;
+  font-size: 15px;
+}
+.readiness-list {
+  margin: 0;
+  padding-left: 19px;
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.readiness-complete {
+  padding: 14px;
+  border-radius: 8px;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 700;
+}
+
+.rag-status-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.rag-status-item {
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.rag-status-item .summary-label {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.rag-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rag-caption {
+  display: block;
+  margin-bottom: 5px;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rag-calculated {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+.history-table-wrap {
+  overflow-x: auto;
+  padding: 0 20px 20px;
+}
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+.history-table th {
+  background: #5b294f;
+  color: #fff;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.78rem;
+}
+.history-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+  font-size: 0.86rem;
+}
+.history-empty {
+  margin: 0 20px 20px;
+  padding: 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.panel {
+  overflow: hidden;
+  margin-bottom: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: white;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.05);
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.panel-heading h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.panel-heading p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.panel-body {
+  padding: 20px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.detail-field {
+  min-width: 0;
+}
+
+.detail-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.detail-value {
+  min-height: 22px;
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.not-set {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.quick-link-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-link {
+  display: block;
+  padding: 17px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #172033;
+  text-decoration: none;
+}
+
+.quick-link:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.quick-link-title {
+  display: block;
+  font-weight: 700;
+}
+
+.quick-link-description {
+  display: block;
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.document-list {
+  display: grid;
+  gap: 12px;
+}
+
+.document-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 15px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.document-information {
+  min-width: 0;
+}
+
+.document-name {
+  display: block;
+  color: #172033;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.document-type {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 14px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.document-notes {
+  display: block;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.document-actions {
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.raid-list {
+  display: grid;
+  gap: 12px;
+}
+
+.raid-card {
+  padding: 15px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.raid-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.raid-title {
+  color: #172033;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.raid-title:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.raid-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.raid-description {
+  margin-top: 9px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.raid-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 14px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.raid-badge.risk {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.raid-badge.assumption {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.raid-badge.issue,
+.raid-badge.overdue {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.raid-badge.dependency {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.raid-badge.closed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.empty-message {
+  padding: 25px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  text-align: center;
+}
+
+.modal-background {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  padding: 30px;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.68);
+}
+
+.modal-background.visible {
+  display: block;
+}
+
+.confirmation-background {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.62);
+}
+.confirmation-background.visible {
+  display: flex;
+}
+.confirmation-bubble {
+  width: min(460px, 100%);
+  padding: 24px;
+  border-radius: 15px;
+  background: white;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35);
+}
+.confirmation-bubble h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.confirmation-bubble p {
+  margin: 10px 0 20px;
+  color: #64748b;
+  line-height: 1.55;
+}
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.modal {
+  max-width: 710px;
+  margin: 25px auto;
+  overflow: hidden;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: #172554;
+  color: white;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.close-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: white;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.form-field.full-width {
+  grid-column: 1 / -1;
+}
+
+label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.required {
+  color: #b91c1c;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  color: #172033;
+  font: inherit;
+}
+
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 3px solid rgba(37, 99, 235, 0.15);
+  border-color: #2563eb;
+}
+
+.help-text {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 24px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+@media (max-width: 1000px) {
+  .project-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rag-status-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  header,
+  nav,
+  main {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  nav {
+    overflow-x: auto;
+  }
+
+  .page-heading {
+    flex-direction: column;
+  }
+
+  .heading-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .heading-actions .button {
+    width: 100%;
+  }
+
+  .project-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .rag-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-field.full-width,
+  .form-field.full-width {
+    grid-column: auto;
+  }
+
+  .document-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .document-actions {
+    width: 100%;
+  }
+
+  .document-actions .button {
+    flex: 1;
+  }
+
+  .modal-background {
+    padding: 10px;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .modal-footer .button {
+    width: 100%;
+  }
+}
+/* Foresters-inspired application palette */
+header {
+  background: #5b294f;
+}
+nav a:hover,
+nav a.active {
+  color: #5b294f;
+  border-bottom-color: #5b294f;
+}
+.button:not(.light):not(.secondary):not(.danger) {
+  background: #9ddcf9;
+  color: #3f1937;
+}
+.button:not(.light):not(.secondary):not(.danger):hover {
+  background: #78c7e9;
+}
+th {
+  background: #5b294f;
+}
+.modal-header {
+  background: #5b294f;
+  color: white;
+}
+.modal-header h2,
+.modal-header h3,
+.modal-header p,
+.modal-close {
+  color: white;
+}
+.progress-fill,
+.task-bar {
+  background: #63bde7;
+}
+.gantt-header .row-details,
+.gantt-header .timeline-row {
+  background: #5b294f;
+}
+/* Full-width responsive application layout */
+:root {
+  --page-gutter: clamp(22px, 2.6vw, 56px);
+}
+header,
+nav,
+main {
+  padding-left: var(--page-gutter);
+  padding-right: var(--page-gutter);
+}
+main {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+@media (min-width: 1550px) {
+  .content-grid {
+    grid-template-columns: minmax(0, 2.5fr) minmax(330px, 0.9fr);
+  }
+}
+@media (max-width: 760px) {
+  :root {
+    --page-gutter: 18px;
+  }
+}
+
+/* ===========================================================================
+   Project details layout
+   ---------------------------------------------------------------------------
+   The page is a single column of collapsible sections, ordered so the things
+   people actually open the page for — status commentary, ownership, reported
+   RAG — sit at the top. Small facts sit inline rather than in cards of their
+   own. The calculated RAG comparison lives at the foot of the page.
+   ========================================================================= */
+
+/* --- compact identity strip, replacing the four large summary cards ------ */
+.identity-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid #5b294f;
+  border-radius: 9px;
+  background: #fff;
+}
+.identity-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+.identity-label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.identity-item b {
+  font-size: 14px;
+  font-weight: 800;
+}
+.identity-spacer {
+  flex: 1 1 auto;
+}
+.identity-link {
+  color: #5b294f;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.identity-link:hover {
+  text-decoration: underline;
+}
+
+/* --- expand / collapse controls ----------------------------------------- */
+.section-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.section-controls-hint {
+  flex: 1 1 auto;
+  color: #64748b;
+  font-size: 12px;
+}
+
+/* --- collapsible sections ----------------------------------------------- */
+section[data-collapsible] .panel-heading {
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0;
+}
+.panel-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  flex: 1 1 auto;
+  padding: 15px 18px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.panel-toggle:hover {
+  background: #faf7fa;
+}
+.panel-toggle:focus-visible {
+  outline: 3px solid rgba(91, 41, 79, 0.25);
+  outline-offset: -3px;
+}
+.panel-caret {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  margin-top: 7px;
+  border-top: 6px solid #5b294f;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+  transition: transform 0.15s ease;
+}
+section[data-collapsible].collapsed .panel-caret {
+  transform: rotate(-90deg);
+}
+section[data-collapsible].collapsed .panel-body {
+  display: none;
+}
+section[data-collapsible].collapsed .panel-heading > :not(.panel-toggle) {
+  display: none;
+}
+section[data-collapsible] .panel-heading > :not(.panel-toggle) {
+  margin: 15px 18px 15px 0;
+}
+
+/* --- status narrative --------------------------------------------------- */
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.status-block {
+  padding: 13px 15px;
+  border: 1px solid #eef2f7;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+.detail-value.narrative {
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+/* --- small facts, inline rather than boxed ------------------------------ */
+.inline-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 26px;
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px solid #eef2f7;
+}
+.inline-facts > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 13px;
+}
+.inline-facts .detail-label {
+  margin: 0;
+}
+.inline-facts b {
+  font-weight: 800;
+}
+.fact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px 20px;
+}
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.fact b {
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+/* --- quick links, as a compact row -------------------------------------- */
+.quick-link-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* --- calculated RAG comparison ------------------------------------------ */
+.variance-note {
+  margin-bottom: 13px;
+  padding: 11px 13px;
+  border: 1px solid #fcd34d;
+  border-left: 5px solid #d97706;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+}
+.variance-note.consistent {
+  border-color: #86efac;
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+  color: #166534;
+}
+.calculated-rag-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.calculated-rag-table th,
+.calculated-rag-table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+  font-size: 12px;
+}
+.calculated-rag-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+}
+.calculated-rag-table tr.rag-variance td {
+  background: #fffbeb;
+}
+
+@media (max-width: 1100px) {
+  .fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .quick-link-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .status-grid,
+  .fact-grid,
+  .quick-link-row {
+    grid-template-columns: 1fr;
+  }
+  .identity-spacer {
+    display: none;
+  }
+}
+
+/* ----------------------------------------------- inline project editor panel
+
+   The project form is injected into #inlineEditorHost by ppm-inline-editor.js, styled by
+   add-project-inline.css - add-project-page.css with every selector scoped to the host.
+
+   Two adjustments are needed on top of that. The form is its own bordered card, which
+   inside a panel body reads as a box in a box, so the card is flattened here. And these
+   selectors carry #inlineEditorPanel as well as the host id, because add-project-inline.css
+   loads after this file and would otherwise win the tie at equal specificity.
+*/
+.panel.inline-editor {
+  border-color: #c4b5fd;
+  border-left: 5px solid #5b294f;
+}
+.panel.inline-editor .panel-body {
+  padding: 0;
+}
+#inlineEditorPanel #inlineEditorHost .form-panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+/* The last section's rule would otherwise double with the form-actions border. */
+#inlineEditorPanel #inlineEditorHost .form-section:last-of-type {
+  border-bottom: 0;
+}
+.inline-editor-status {
+  margin: 0;
+  padding: 18px 20px;
+  color: #475569;
+  font-size: 13px;
+}
+.inline-editor-status:empty {
+  display: none;
+}
+
+/* ---------------------------------------------- the three project editors
+
+   The panel the editors render into, and the form itself. Written here rather than borrowed
+   from add-project-page.css: that stylesheet and this one share 43 selectors and disagree on
+   twelve of them, including main, label, .button and every form control, so loading both
+   would re-lay-out this page. The editors are part of this page and are styled by it.
+*/
+.panel.project-editor {
+  border-color: #c4b5fd;
+  border-left: 5px solid var(--plum, #5b294f);
+}
+.pf-summary {
+  display: none;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #fca5a5;
+  border-left: 5px solid #dc2626;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 700;
+}
+.pf-summary.visible {
+  display: block;
+}
+
+/* A group per collapsible block, first one open. <details> gives keyboard support and
+   the open state for free, without a line of JavaScript. */
+.pf-group {
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fbfcfe;
+}
+.pf-group:last-of-type {
+  margin-bottom: 0;
+}
+.pf-group > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border-radius: 9px;
+  cursor: pointer;
+  list-style: none;
+}
+.pf-group > summary::-webkit-details-marker {
+  display: none;
+}
+.pf-group > summary:hover {
+  background: #f1f5f9;
+}
+.pf-group[open] > summary {
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 9px 9px 0 0;
+  background: #f8fafc;
+}
+.pf-group-name {
+  font-size: 14px;
+  font-weight: 800;
+}
+.pf-group-name::before {
+  content: "\25B8  ";
+  color: var(--plum, #5b294f);
+}
+.pf-group[open] .pf-group-name::before {
+  content: "\25BE  ";
+}
+.pf-group-count {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  padding: 16px 15px;
+}
+.pf-field-wide {
+  grid-column: 1 / -1;
+}
+.pf-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.pf-required {
+  color: #b91c1c;
+}
+.pf-field input,
+.pf-field select,
+.pf-field textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+}
+.pf-field input[readonly] {
+  background: #f1f5f9;
+  color: #475569;
+}
+.pf-field textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+.pf-help {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.pf-problem {
+  margin: 5px 0 0;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+}
+.pf-problem:empty {
+  display: none;
+}
+.pf-field-invalid input,
+.pf-field-invalid select,
+.pf-field-invalid textarea {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+/* What the rules calculate, next to what was reported.
+
+   Both are coloured by their value, using the same palette as the read-only RAG panels on
+   this page: green for Green, amber for Amber, red for Red, grey for Not Assessed. The badge
+   was previously one fixed purple whatever the value, so a green project was labelled in a
+   colour that means nothing. */
+.pf-calculated {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.pf-rag-green {
+  background: #dcfce7;
+  color: #166534;
+}
+.pf-rag-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+.pf-rag-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.pf-rag-none {
+  background: #e2e8f0;
+  color: #475569;
+}
+/* A select carries its own colour too, so the form reads at a glance rather than word by
+   word. The border stays neutral so the control still looks like a control. */
+.pf-field select.pf-rag-green,
+.pf-field select.pf-rag-amber,
+.pf-field select.pf-rag-red,
+.pf-field select.pf-rag-none {
+  font-weight: 700;
+}
+/* An override is worth noticing whatever colour it is, so it is outlined rather than
+   recoloured - recolouring it would hide the value it is reporting. */
+.pf-calculated-override {
+  box-shadow: 0 0 0 2px #92400e inset;
+}
+/* The reason only appears when the reported value actually differs. */
+.pf-override-label,
+.pf-override-reason {
+  display: none;
+}
+.pf-override-needed .pf-override-label,
+.pf-override-needed .pf-override-reason {
+  display: block;
+}
+.pf-override-label {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+/* The three quick links became <button>s, because they open an editor on this page rather
+   than going anywhere. A button needs telling to look like the block it replaced. */
+button.quick-link {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}

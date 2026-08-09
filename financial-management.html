@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Financial Management | Foresters Portfolio</title>
+  <link rel="stylesheet" href="financial-management-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Project financial control, forecasting and budget approvals</p>
+    </header>
+    <nav aria-label="Primary navigation">
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html">Registers</a><a href="benefits-management.html">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a class="active" href="financial-management.html">Financials</a
+      ><a href="audit-history.html">Audit History</a><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div id="pageMessage" class="message" role="status" aria-live="polite"></div>
+      <div id="readOnlyBanner" class="read-only-banner">
+        This project is archived. Its financial position and approval history remain available, but changes
+        are disabled.
+      </div>
+      <div class="page-heading">
+        <div>
+          <h2>Financial Management</h2>
+          <p>
+            Maintain budget categories and cost lines, compare forecast and actual expenditure, and route
+            every approved budget change through a retained authorisation record.
+          </p>
+        </div>
+        <div class="heading-actions">
+          <a id="projectDetailsLink" class="button light" href="index.html">Project details</a
+          ><a id="projectAuditLink" class="button light" href="audit-history.html">View audit history</a
+          ><button id="categoryButton" class="button light" type="button" data-permission="financials.configure">Manage categories</button>
+        </div>
+      </div>
+      <section class="selector-row">
+        <div>
+          <label for="projectSelect">Project</label
+          ><select id="projectSelect"></select>
+        </div>
+        <div class="button-row">
+          <span id="approvalBadge" class="status-badge">No approved budget</span
+          ><button id="requestApprovalButton" class="button" type="button">Request budget approval</button>
+        </div>
+      </section>
+      <section class="summary-grid" aria-label="Financial summary">
+        <div class="summary-card">
+          <div class="summary-label">Proposed budget</div>
+          <div id="proposedBudget" class="summary-value">£0.00</div>
+          <div class="summary-note">Total of budget lines</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Approved budget</div>
+          <div id="approvedBudget" class="summary-value">£0.00</div>
+          <div id="budgetVersion" class="summary-note">No approved version</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Forecast cost</div>
+          <div id="forecastCost" class="summary-value">£0.00</div>
+          <div class="summary-note">Current cost forecast</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Actual cost</div>
+          <div id="actualCost" class="summary-value">£0.00</div>
+          <div class="summary-note">Cost incurred to date</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Committed cost</div>
+          <div id="committedCost" class="summary-value">£0.00</div>
+          <div class="summary-note">Committed expenditure</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Estimate at completion</div>
+          <div id="estimateAtCompletion" class="summary-value">£0.00</div>
+          <div class="summary-note">Actual + remaining forecast</div>
+        </div>
+        <div id="varianceCard" class="summary-card">
+          <div class="summary-label">Budget variance</div>
+          <div id="budgetVariance" class="summary-value">£0.00</div>
+          <div id="budgetVariancePercent" class="summary-note">Not available without approved budget</div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Financial ownership and commentary</h3>
+            <p>These fields provide the accountable owner and the current stakeholder summary.</p>
+          </div>
+        </div>
+        <div class="metadata-grid">
+          <div class="field">
+            <label for="financialOwner">Financial owner *</label
+            ><select id="financialOwner" required></select>
+          </div>
+          <div class="field">
+            <label for="fundingSource">Funding source *</label
+            ><input id="fundingSource" type="text" required placeholder="e.g. Transformation investment" />
+          </div>
+          <div class="field">
+            <label for="financialRag">Financial RAG</label
+            ><select id="financialRag">
+              <option>Not Assessed</option>
+              <option>Green</option>
+              <option>Amber</option>
+              <option>Red</option></select
+            ><small
+              >The suggested RAG is calculated from approved budget variance, but may be reported with
+              commentary.</small
+            >
+          </div>
+          <div class="field">
+            <label for="financialCommentary">Financial commentary</label
+            ><textarea
+              id="financialCommentary"
+              placeholder="Explain the financial position, drivers and action being taken"
+            ></textarea>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Cost plan</h3>
+            <p>
+              Add and edit lines directly. Remaining forecast is calculated as forecast less actual, never
+              below zero.
+            </p>
+          </div>
+          <div class="button-row">
+            <span id="unsavedIndicator" class="unsaved">All changes saved</span
+            ><button id="saveButton" class="button" type="button" disabled data-permission="financials.edit">Saved</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="finance-table">
+            <thead>
+              <tr>
+                <th class="mw-130">Financial line ID</th>
+                <th class="mw-175">Category</th>
+                <th class="mw-240">Description</th>
+                <th class="mw-135">Financial period</th>
+                <th class="mw-145">Budget amount</th>
+                <th class="mw-145">Forecast cost</th>
+                <th class="mw-135">Actual cost</th>
+                <th class="mw-145">Committed cost</th>
+                <th class="mw-155">Remaining forecast</th>
+                <th class="mw-240">Notes</th>
+                <th class="mw-100">Row action</th>
+              </tr>
+            </thead>
+            <tbody id="financeBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty">No financial cost lines have been added for this project.</div>
+        <button id="addRowButton" class="add-row" type="button" data-permission="financials.edit">+ Add financial line</button>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Budget approval history</h3>
+            <p>
+              Every request keeps the submitted budget snapshot, prior approved value, decision and approver
+              comments.
+            </p>
+          </div>
+        </div>
+        <div id="approvalHistory" class="history-wrap"></div>
+      </section>
+    </main>
+
+    <div id="categoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="categoryTitle">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="categoryTitle">Financial categories</h3>
+          <p>
+            Configure the categories available on cost plan rows. Existing categories can be made inactive
+            without changing historic records.
+          </p>
+        </div>
+        <div class="modal-body">
+          <div id="categoryList" class="category-list"></div>
+          <button id="addCategoryButton" class="button light" type="button" data-permission="financials.configure">+ Add category</button>
+        </div>
+        <div class="modal-foot">
+          <button class="button light" type="button" data-close="categoryModal">Cancel</button
+          ><button id="saveCategoriesButton" class="button" type="button" data-permission="financials.configure">Save categories</button>
+        </div>
+      </div>
+    </div>
+    <div id="approvalModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="approvalTitle">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="approvalTitle">Request budget approval</h3>
+          <p id="approvalSummary"></p>
+        </div>
+        <form id="approvalForm">
+          <div class="modal-body">
+            <div class="field">
+              <label for="approvalRequester">Requester</label
+              ><select id="approvalRequester" required></select>
+            </div>
+            <div class="field">
+              <label for="approvalApprover">Approver</label
+              ><select id="approvalApprover" required></select>
+            </div>
+            <div class="field">
+              <label for="approvalReason">Reason and impact</label
+              ><textarea
+                id="approvalReason"
+                required
+                placeholder="Explain why this budget or budget change is needed and its impact"
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="button light" type="button" data-close="approvalModal">Cancel</button
+            ><button class="button" type="submit" data-permission="financials.edit">Submit for approval</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="decisionModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="decisionTitle">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="decisionTitle">Decide budget request</h3>
+          <p id="decisionSummary"></p>
+        </div>
+        <form id="decisionForm">
+          <div class="modal-body">
+            <div class="field">
+              <label for="decisionMaker">Decision recorded by</label
+              ><select id="decisionMaker" required></select>
+            </div>
+            <div class="field">
+              <label for="decisionComments">Decision comments</label
+              ><textarea
+                id="decisionComments"
+                required
+                placeholder="Record the decision rationale and any conditions"
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button class="button light" type="button" data-close="decisionModal">Cancel</button
+            ><button id="rejectButton" class="button danger" type="button" data-permission="financials.approve">Reject</button
+            ><button class="button" type="submit" data-permission="financials.approve">Approve</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="deleteModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+      <div class="modal-card xw-520">
+        <div class="modal-head">
+          <h3 id="deleteTitle">Delete financial line?</h3>
+          <p id="deleteText">The line will be removed when the cost plan is saved.</p>
+        </div>
+        <div class="modal-foot">
+          <button class="button light" type="button" data-close="deleteModal">Cancel</button
+          ><button id="confirmDeleteButton" class="button danger" type="button" data-permission="financials.edit">Delete line</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|ppm-financial-utils.js?v=2026.08.09.11|financial-management-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+  </body>
+</html>

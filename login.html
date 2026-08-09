@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Sign in | Foresters Portfolio</title>
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <link rel="stylesheet" href="login-page.css?v=2026.08.09.11" />
+</head>
+  <body class="ppm-public-page">
+    <div class="shell">
+      <section class="brand-panel" aria-label="Foresters Portfolio introduction">
+        <div class="brand">
+          <span class="brand-mark"><span class="brand-icon">F</span> Foresters Portfolio</span>
+        </div>
+        <div class="brand-copy">
+          <h1>One place to see delivery clearly.</h1>
+          <p>Secure access to projects, programmes, people, finances, governance and portfolio reporting.</p>
+          <div class="benefits">
+            <div class="benefit">
+              <span class="tick">✓</span
+              ><span>Role-based pages and actions aligned to each person’s responsibilities.</span>
+            </div>
+            <div class="benefit">
+              <span class="tick">✓</span
+              ><span
+                >Project-specific scope keeps restricted delivery and financial information controlled.</span
+              >
+            </div>
+            <div class="benefit">
+              <span class="tick">✓</span
+              ><span>Sign-in, account and permission changes are retained in Audit History.</span>
+            </div>
+          </div>
+        </div>
+        <div class="prototype-note">
+          <strong>Pilot build:</strong> sign-in and every read and write are protected by Supabase Auth,
+          multi-factor authentication and server-enforced row-level security. All application data now lives
+          in PostgreSQL. This is a pilot for testing, not a finished product.
+        </div>
+      </section>
+
+      <main class="form-panel">
+        <section class="card">
+          <div id="message" class="message" role="status" aria-live="polite"></div>
+
+          <div id="existingSession" class="hidden">
+            <h2>Welcome back</h2>
+            <p id="existingSessionText" class="intro"></p>
+            <div class="button-row">
+              <button id="continueButton" class="button" type="button">Continue to Home</button
+              ><button id="otherAccountButton" class="button secondary" type="button">
+                Use another account
+              </button>
+            </div>
+          </div>
+
+          <div id="loginSection">
+            <h2>Sign in</h2>
+            <p class="intro">Use your Supabase Auth email address and password.</p>
+            <form id="loginForm">
+              <div class="field">
+                <label for="loginEmail">Email address</label
+                ><input id="loginEmail" type="email" autocomplete="username" maxlength="254" required />
+              </div>
+              <div class="field">
+                <label for="loginPassword">Password</label>
+                <div class="password-wrap">
+                  <input id="loginPassword" type="password" autocomplete="current-password" required /><button
+                    class="show-password"
+                    type="button"
+                    data-password-target="loginPassword"
+                  >
+                    Show
+                  </button>
+                </div>
+              </div>
+              <button id="loginButton" class="button" type="submit">Sign in</button>
+            </form>
+            <p class="support">
+              Multi-factor authentication is required after your password is accepted.
+            </p>
+          </div>
+
+          <div id="mfaSection" class="hidden">
+            <h2>Authenticator verification</h2>
+            <p class="intro">Enter the six-digit code from your authenticator app.</p>
+            <form id="mfaForm">
+              <div class="field">
+                <label for="mfaCode">Authenticator code</label
+                ><input
+                  id="mfaCode"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="6"
+                  pattern="[0-9]{6}"
+                  required
+                />
+              </div>
+              <div class="button-row">
+                <button id="mfaButton" class="button" type="submit">Verify and continue</button
+                ><button id="mfaCancelButton" class="button secondary" type="button">Back</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Stage 13A: first-run authenticator enrolment. Reached when the
+               account has no verified factor, which previously dead-ended. -->
+          <div id="enrolSection" class="hidden">
+            <h2>Set up your authenticator</h2>
+            <p class="intro">
+              This is a one-off step. Scan the code below with an authenticator app — Microsoft
+              Authenticator, Google Authenticator, 1Password and Authy all work — then enter the six-digit code
+              it shows.
+            </p>
+            <div id="enrolQr" class="enrol-qr" aria-label="Authenticator QR code"></div>
+            <p class="support">
+              Cannot scan it? Add the account manually using this key:<br />
+              <code id="enrolSecret" class="enrol-secret"></code>
+            </p>
+            <form id="enrolForm">
+              <div class="field">
+                <label for="enrolCode">Code from your authenticator</label
+                ><input
+                  id="enrolCode"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="6"
+                  pattern="[0-9]{6}"
+                  required
+                />
+              </div>
+              <div class="button-row">
+                <button id="enrolButton" class="button" type="submit">Confirm authenticator</button
+                ><button id="enrolCancelButton" class="button secondary" type="button">Back</button>
+              </div>
+            </form>
+            <p class="support">
+              Keep the authenticator app. You need a fresh code from it every time you sign in.
+            </p>
+          </div>
+
+          <!-- Stage 13A: forced password change for an administrator-issued password. -->
+          <div id="passwordSection" class="hidden">
+            <h2>Choose your own password</h2>
+            <p class="intro">
+              You signed in with a temporary password that an administrator created and can see. Choose your
+              own now — it will be known only to you.
+            </p>
+            <form id="passwordForm">
+              <div class="field">
+                <label for="newPassword">New password</label>
+                <div class="password-wrap">
+                  <input
+                    id="newPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="12"
+                    required
+                  /><button class="show-password" type="button" data-password-target="newPassword">
+                    Show
+                  </button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="confirmPassword">Confirm new password</label>
+                <div class="password-wrap">
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="12"
+                    required
+                  /><button class="show-password" type="button" data-password-target="confirmPassword">
+                    Show
+                  </button>
+                </div>
+              </div>
+              <button id="passwordButton" class="button" type="submit">Save password and continue</button>
+            </form>
+            <p class="support">
+              At least 12 characters, and it must be different from the temporary one. A passphrase of three
+              or four unrelated words is both stronger and easier to remember than a short complex string.
+            </p>
+          </div>
+
+        </section>
+      </main>
+    </div>
+
+    <script src="login-page.js?v=2026.08.09.11"></script>
+  </body>
+</html>

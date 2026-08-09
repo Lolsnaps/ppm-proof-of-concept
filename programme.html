@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Programmes | PPM Tool</title>
+  <link rel="stylesheet" href="programme-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+    <nav>
+      <a href="index.html">Projects</a><a href="programme.html" class="active">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html">Registers</a><a href="benefits-management.html">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div class="page-heading">
+        <div>
+          <h2>Programmes and workstreams</h2>
+          <p>
+            Create and maintain programme ownership, strategic information, budgets, benefits and the
+            programme-level milestones and RAID records behind each group of projects.
+          </p>
+        </div>
+        <button id="addProgrammeButton" type="button" class="button" data-permission="programmes.edit">Add programme</button>
+      </div>
+      <div id="pageMessage" class="message" role="status"></div>
+      <section class="summary-grid" aria-label="Programme summary">
+        <div class="summary-card">
+          <div class="summary-label">Programmes</div>
+          <div id="programmeCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Active programmes</div>
+          <div id="activeProgrammeCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Associated projects</div>
+          <div id="programmeProjectCount" class="summary-value">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Programme budget</div>
+          <div id="programmeBudget" class="summary-value">£0</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-label">Open programme RAID</div>
+          <div id="programmeRaidCount" class="summary-value">0</div>
+        </div>
+      </section>
+      <section class="filter-panel" aria-label="Programme filters">
+        <input
+          id="programmeSearch"
+          type="search"
+          placeholder="Search programme, owner, objective or project"
+          aria-label="Search programmes"
+        />
+        <select id="programmeStatusFilter" aria-label="Filter by programme status">
+          <option value="">All statuses</option>
+          <option>Proposed</option>
+          <option>Active</option>
+          <option>On Hold</option>
+          <option>Completed</option>
+          <option>Inactive</option>
+        </select>
+        <select id="programmeRagFilter" aria-label="Filter by programme RAG">
+          <option value="">All RAG statuses</option>
+          <option>Green</option>
+          <option>Amber</option>
+          <option>Red</option>
+          <option>Not Assessed</option>
+        </select>
+      </section>
+      <div id="programmeList" class="programme-list"></div>
+    </main>
+
+    <div
+      id="programmeModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="programmeModalTitle"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="programmeModalTitle">Add programme</h2>
+            <p>Maintain the programme or workstream record required by PPM-PORT-003.</p>
+          </div>
+          <button id="closeProgrammeModal" type="button" class="modal-close" aria-label="Close">
+            &times;
+          </button>
+        </div>
+        <form id="programmeForm">
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="programmeId">Programme ID</label><input id="programmeId" readonly />
+              </div>
+              <div class="form-field two-columns">
+                <label for="programmeName">Programme / workstream name <span class="required">*</span></label
+                ><input id="programmeName" maxlength="180" required />
+              </div>
+              <div class="form-field">
+                <label for="programmePortfolio">Portfolio <span class="required">*</span></label
+                ><select id="programmePortfolio" required>
+                  <option value="">Select a portfolio</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeStatus">Overall status</label
+                ><select id="programmeStatus">
+                  <option>Proposed</option>
+                  <option selected>Active</option>
+                  <option>On Hold</option>
+                  <option>Completed</option>
+                  <option>Inactive</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeRag">Overall RAG</label
+                ><select id="programmeRag">
+                  <option>Not Assessed</option>
+                  <option>Green</option>
+                  <option>Amber</option>
+                  <option>Red</option>
+                </select>
+              </div>
+              <div class="form-field full-width">
+                <label for="programmeDescription">Description <span class="required">*</span></label
+                ><textarea id="programmeDescription" required></textarea>
+              </div>
+              <div class="form-field">
+                <label for="programmeSponsor">Sponsor</label
+                ><select id="programmeSponsor">
+                  <option value="">Select a sponsor</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeLead">Programme lead</label
+                ><select id="programmeLead">
+                  <option value="">Select a lead</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeManager">Programme manager</label
+                ><select id="programmeManager">
+                  <option value="">Select a programme manager</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeStartDate">Start date</label
+                ><input id="programmeStartDate" type="date" />
+              </div>
+              <div class="form-field">
+                <label for="programmeEndDate">End date</label><input id="programmeEndDate" type="date" />
+              </div>
+              <div class="form-field">
+                <label for="programmeBudgetInput">Budget (£)</label
+                ><input id="programmeBudgetInput" type="number" min="0" step="1000" />
+              </div>
+              <div class="form-field full-width">
+                <label for="programmeObjective">Strategic objective</label
+                ><textarea id="programmeObjective"></textarea>
+              </div>
+              <div class="form-field full-width">
+                <label for="programmeBenefits">Expected benefits</label
+                ><textarea id="programmeBenefits"></textarea>
+              </div>
+              <div class="form-field full-width">
+                <label for="programmeCommentary">Current commentary</label
+                ><textarea id="programmeCommentary"></textarea>
+              </div>
+              <div class="form-field full-width">
+                <label for="programmeNextSteps">Next steps</label
+                ><textarea id="programmeNextSteps"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelProgrammeButton" type="button" class="button light">Cancel</button
+            ><button type="submit" class="button" data-permission="programmes.edit">Save programme</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="recordModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="recordModalTitle"
+    >
+      <div class="modal record-modal">
+        <div class="modal-header">
+          <div>
+            <h2 id="recordModalTitle">Add programme record</h2>
+            <p id="recordModalDescription"></p>
+          </div>
+          <button id="closeRecordModal" type="button" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <form id="recordForm">
+          <input id="recordProgrammeId" type="hidden" /><input id="recordId" type="hidden" /><input
+            id="recordKind"
+            type="hidden"
+          />
+          <div class="modal-body">
+            <div id="milestoneFields" class="form-grid">
+              <div class="form-field two-columns">
+                <label for="milestoneTitle">Milestone <span class="required">*</span></label
+                ><input id="milestoneTitle" maxlength="220" />
+              </div>
+              <div class="form-field">
+                <label for="milestoneType">Type</label
+                ><select id="milestoneType">
+                  <option>Milestone</option>
+                  <option>Stage Gate</option>
+                  <option>Decision Point</option>
+                  <option>Implementation</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="milestoneBaselineDate">Baseline date</label
+                ><input id="milestoneBaselineDate" type="date" />
+              </div>
+              <div class="form-field">
+                <label for="milestoneForecastDate">Forecast date</label
+                ><input id="milestoneForecastDate" type="date" />
+              </div>
+              <div class="form-field">
+                <label for="milestoneComplete">Complete (%)</label
+                ><input id="milestoneComplete" type="number" min="0" max="100" value="0" />
+              </div>
+              <div class="form-field">
+                <label for="milestoneStatus">Status</label
+                ><select id="milestoneStatus">
+                  <option>Not Started</option>
+                  <option>In Progress</option>
+                  <option>Complete</option>
+                  <option>On Hold</option>
+                </select>
+              </div>
+              <div class="form-field two-columns">
+                <label for="milestoneOwner">Owner</label
+                ><select id="milestoneOwner">
+                  <option value="">Select an owner</option>
+                </select>
+              </div>
+              <div class="form-field full-width">
+                <label for="milestoneNotes">Notes</label><textarea id="milestoneNotes"></textarea>
+              </div>
+            </div>
+            <div id="raidFields" class="form-grid" hidden>
+              <div class="form-field">
+                <label for="programmeRaidType">Type</label
+                ><select id="programmeRaidType">
+                  <option>Risk</option>
+                  <option>Assumption</option>
+                  <option>Issue</option>
+                  <option>Dependency</option>
+                </select>
+              </div>
+              <div class="form-field two-columns">
+                <label for="programmeRaidTitle">Title <span class="required">*</span></label
+                ><input id="programmeRaidTitle" maxlength="220" />
+              </div>
+              <div class="form-field full-width">
+                <label for="programmeRaidDescription">Description <span class="required">*</span></label
+                ><textarea id="programmeRaidDescription"></textarea>
+              </div>
+              <div class="form-field">
+                <label for="programmeRaidOwner">Owner</label
+                ><select id="programmeRaidOwner">
+                  <option value="">Select an owner</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeRaidPriority">Priority</label
+                ><select id="programmeRaidPriority">
+                  <option>Low</option>
+                  <option selected>Medium</option>
+                  <option>High</option>
+                  <option>Critical</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeRaidStatus">Status</label
+                ><select id="programmeRaidStatus">
+                  <option>Open</option>
+                  <option>Monitoring</option>
+                  <option>Escalated</option>
+                  <option>Closed</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="programmeRaidTargetDate">Target / review date</label
+                ><input id="programmeRaidTargetDate" type="date" />
+              </div>
+              <div class="form-field two-columns">
+                <label for="programmeRaidResponse">Response / action</label
+                ><textarea id="programmeRaidResponse"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelRecordButton" type="button" class="button light">Cancel</button
+            ><button type="submit" class="button" data-permission="programmes.edit">Save record</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="confirmationBackground"
+      class="confirmation-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirmationTitle"
+    >
+      <div class="confirmation-bubble">
+        <h2 id="confirmationTitle">Remove record?</h2>
+        <p id="confirmationMessage"></p>
+        <div class="confirmation-actions">
+          <button id="cancelConfirmation" type="button" class="button light">Cancel</button
+          ><button id="confirmAction" type="button" class="button danger" data-permission="programmes.edit">Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|ppm-governance-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|programme-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+    
+    
+  </body>
+</html>

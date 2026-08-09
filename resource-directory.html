@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Resource Directory | PPM Tool</title>
+
+  <link rel="stylesheet" href="resource-directory-page.css?v=2026.08.09.11" />
+</head>
+
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+
+    <nav>
+      <a href="index.html">Projects</a>
+      <a href="programme.html">Programmes</a>
+      <a href="milestones.html">Milestones</a>
+      <a href="raid-log.html">RAID Log</a>
+      <a href="registers.html">Registers</a>
+      <a href="benefits-management.html">Benefits</a>
+      <a href="resource-directory.html" class="active">Resources</a>
+      <a href="resource-management.html">Resource Management</a>
+      <a href="financial-management.html">Financials</a>
+      <a href="audit-history.html">Audit History</a>
+      <a href="reports.html">Reports &amp; Dashboards</a>
+      <a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+
+      <div class="page-heading">
+        <div>
+          <h2>Resource directory</h2>
+          <p>Maintain the people and generic resources used by project and task picklists.</p>
+        </div>
+        <div class="heading-actions">
+          <a href="resource-management.html" class="button light">View allocations</a>
+          <button id="addResourceButton" type="button" class="button" data-permission="resources.edit">Add resource</button>
+        </div>
+      </div>
+
+      <section class="summary-grid" aria-label="Resource summary">
+        <div class="summary-card">
+          <div class="label">Total resources</div>
+          <div id="totalResources" class="number">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Active resources</div>
+          <div id="activeResources" class="number">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Teams</div>
+          <div id="totalTeams" class="number">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Details required</div>
+          <div id="reviewResources" class="number">0</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">Active user accounts</div>
+          <div id="activeAccounts" class="number">0</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h3>People and resources</h3>
+          <p>Existing names are migrated without fabricated email addresses and flagged for completion.</p>
+        </div>
+
+        <div class="filter-row">
+          <input
+            id="searchFilter"
+            type="search"
+            aria-label="Search resources"
+            placeholder="Search name, email, team, title or role"
+          />
+          <select id="teamFilter" aria-label="Filter by team">
+            <option value="">All teams</option>
+          </select>
+          <select id="statusFilter" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Needs review">Needs review</option>
+          </select>
+          <select id="accountFilter" aria-label="Filter by account">
+            <option value="">All login statuses</option>
+            <option value="Active">Login active</option>
+            <option value="Suspended">Login suspended</option>
+            <option value="Not enabled">Login not enabled</option>
+          </select>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Resource ID</th>
+                <th>Name and email</th>
+                <th>Team</th>
+                <th>Job title / role</th>
+                <th>Manager</th>
+                <th>Weekly capacity</th>
+                <th>Resource status</th>
+                <th>Login and permission level</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="resourceTableBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyMessage" class="empty-message">No resources match the selected filters.</div>
+      </section>
+    </main>
+
+    <div
+      id="resourceModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="resourceModalTitle"
+    >
+      <div class="modal">
+        <form id="resourceForm">
+          <div class="modal-header">
+            <div>
+              <h3 id="resourceModalTitle">Add resource</h3>
+              <p>Resource details support PPM-RES-001 and generic placeholders support PPM-RES-002.</p>
+            </div>
+            <button id="closeModalButton" type="button" class="close-button" aria-label="Close" data-permission="none">
+              &times;
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="resourceId">Resource ID</label>
+                <input id="resourceId" type="text" readonly placeholder="Generated on save" />
+              </div>
+
+              <div class="form-field">
+                <label for="resourceKind">Resource kind <span class="required">*</span></label>
+                <select id="resourceKind" required>
+                  <option value="Named person">Named person</option>
+                  <option value="Generic placeholder">Generic placeholder</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="resourceStatus">Status <span class="required">*</span></label>
+                <select id="resourceStatus" required>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div class="form-field two-columns">
+                <label for="fullName"
+                  ><span id="nameLabel">Full name</span> <span class="required">*</span></label
+                >
+                <input id="fullName" type="text" maxlength="160" required />
+              </div>
+
+              <div class="form-field">
+                <label for="email">Email address <span id="emailRequired" class="required">*</span></label>
+                <input id="email" type="email" maxlength="254" required />
+                <p id="emailHelp" class="help-text">
+                  Required for named people and used alongside picklist selections.
+                </p>
+              </div>
+
+              <div class="form-field">
+                <label for="team">Team <span class="required">*</span></label>
+                <input id="team" type="text" maxlength="120" required />
+              </div>
+
+              <div class="form-field">
+                <label for="department">Department</label>
+                <input id="department" type="text" maxlength="120" />
+              </div>
+
+              <div class="form-field">
+                <label for="location">Location</label>
+                <input id="location" type="text" maxlength="120" />
+              </div>
+
+              <div class="form-field">
+                <label for="jobTitle">Job title</label>
+                <input id="jobTitle" type="text" maxlength="120" />
+              </div>
+
+              <div class="form-field">
+                <label for="role">Project / resource role <span class="required">*</span></label>
+                <input id="role" type="text" maxlength="120" required />
+              </div>
+
+              <div class="form-field">
+                <label for="managerResourceId">Manager</label>
+                <select id="managerResourceId">
+                  <option value="">Select a manager</option>
+                </select>
+              </div>
+
+              <div class="form-field full-width">
+                <label for="skills">Skills</label>
+                <textarea id="skills" placeholder="Enter skills separated by commas"></textarea>
+              </div>
+
+              <div class="form-field">
+                <label for="resourceType">Employment / resource type</label>
+                <select id="resourceType">
+                  <option value="Employee">Employee</option>
+                  <option value="Contractor">Contractor</option>
+                  <option value="Consultant">Consultant</option>
+                  <option value="Supplier">Supplier</option>
+                  <option value="Agency">Agency</option>
+                  <option value="Generic demand">Generic demand</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="workingPattern">Working pattern</label>
+                <select id="workingPattern">
+                  <option value="Full time">Full time</option>
+                  <option value="Part time">Part time</option>
+                  <option value="Flexible">Flexible</option>
+                  <option value="Shift">Shift</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="standardWeeklyCapacity"
+                  >Standard weekly capacity (hours) <span class="required">*</span></label
+                >
+                <input
+                  id="standardWeeklyCapacity"
+                  type="number"
+                  min="0"
+                  max="168"
+                  step="0.5"
+                  value="37.5"
+                  required
+                />
+              </div>
+
+              <div class="form-field">
+                <label for="nonWorkingHoursPerWeek">Contracted non-working time (hours/week)</label>
+                <input id="nonWorkingHoursPerWeek" type="number" min="0" max="168" step="0.5" value="0" />
+              </div>
+
+              <div class="form-field">
+                <label for="fixedOperationalHoursPerWeek">Fixed operational commitments (hours/week)</label>
+                <input
+                  id="fixedOperationalHoursPerWeek"
+                  type="number"
+                  min="0"
+                  max="168"
+                  step="0.5"
+                  value="0"
+                />
+              </div>
+
+              <div class="form-field">
+                <label for="otherUnavailableHoursPerWeek">Other unavailable time (hours/week)</label>
+                <input
+                  id="otherUnavailableHoursPerWeek"
+                  type="number"
+                  min="0"
+                  max="168"
+                  step="0.5"
+                  value="0"
+                />
+              </div>
+
+              <div class="form-field">
+                <label for="effectiveStartDate">Effective start date</label>
+                <input id="effectiveStartDate" type="date" />
+              </div>
+
+              <div class="form-field">
+                <label for="effectiveEndDate">Effective end date</label>
+                <input id="effectiveEndDate" type="date" />
+              </div>
+
+              <section id="accessSection" class="access-section" data-permission="users.manage">
+                <h4>Login and permissions</h4>
+                <p>
+                  Enable a named person to sign in, apply a requirement-aligned role template, limit project
+                  scope and record carefully controlled exceptions.
+                </p>
+                <div class="access-grid">
+                  <div class="form-field">
+                    <label for="accessRole">Permission level</label>
+                    <select id="accessRole">
+                      <option value="">No login role</option>
+                    </select>
+                  </div>
+                  <!--
+                    A person may hold more than one role: an executive who sponsors projects
+                    needs portfolio-wide visibility from one and approval authority from the
+                    other. Permissions are the union of every role held.
+                  -->
+                  <div class="form-field">
+                    <label for="additionalRoles">Additional roles</label>
+                    <select id="additionalRoles" multiple size="4" data-permission="users.manage"></select>
+                    <p class="help-text" id="additionalRolesDescription">
+                      Optional. Hold Ctrl (or Cmd) to choose more than one.
+                    </p>
+                  </div>
+                  <div class="form-field">
+                    <label for="accountStatus">Login status</label>
+                    <select id="accountStatus">
+                      <option value="Not enabled">Not enabled</option>
+                      <option value="Active">Active</option>
+                      <option value="Suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="accessScope">Project data scope</label>
+                    <select id="accessScope">
+                      <option value="Portfolio-wide">Portfolio-wide</option>
+                      <option value="Assigned projects">Assigned projects</option>
+                      <option value="Team projects">Team projects</option>
+                      <option value="Selected projects">Selected projects</option>
+                    </select>
+                  </div>
+                  <div id="accessRoleDescription" class="access-description full-width">
+                    Select a permission level to see what it allows.
+                  </div>
+                  <div id="selectedProjectField" class="form-field full-width">
+                    <label for="selectedProjectCodes">Additional / selected projects</label>
+                    <select id="selectedProjectCodes" multiple size="5"></select>
+                    <p class="help-text">
+                      Use Ctrl (Windows) or Command (Mac) to select more than one. Assigned and team scopes
+                      also include these named exceptions.
+                    </p>
+                  </div>
+                  <div class="form-field full-width">
+                    <label>Advanced permission overrides</label>
+                    <div class="override-grid">
+                      <div>
+                        <label for="overrideFinancialDetail">Financial detail</label
+                        ><select id="overrideFinancialDetail">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="overrideFinancialEdit">Edit financials</label
+                        ><select id="overrideFinancialEdit">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="overrideApprovals">Approval decisions</label
+                        ><select id="overrideApprovals">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="overrideGovernanceAdmin">Governance administration</label
+                        ><select id="overrideGovernanceAdmin">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="overrideGovernanceOverride">Stage-gate override</label
+                        ><select id="overrideGovernanceOverride">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="overrideAudit">Audit History</label
+                        ><select id="overrideAudit">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="overrideExport">Report exports</label
+                        ><select id="overrideExport">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="overrideUsers">Manage user accounts</label
+                        ><select id="overrideUsers">
+                          <option value="inherit">Use role setting</option>
+                          <option value="allow">Allow</option>
+                          <option value="deny">Deny</option>
+                        </select>
+                      </div>
+                    </div>
+                    <p class="help-text">
+                      Overrides are exceptional. A deny always takes precedence over the selected role
+                      template.
+                    </p>
+                  </div>
+                  <div class="form-field full-width">
+                    <label>Sign-in account</label>
+                    <p class="help-text">
+                      Foresters Portfolio no longer holds passwords. Sign-in accounts are provisioned
+                      separately in Supabase Auth and linked to this Resource record, and multi-factor
+                      authentication is required at every sign-in. The role, scope and permission settings
+                      above control what this person sees in the application.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button id="cancelButton" type="button" class="button secondary" data-permission="none">Cancel</button>
+            <button id="saveResourceButton" type="submit" class="button" data-permission="resources.edit">Save resource</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-resource-utils.js?v=2026.08.09.11|ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|resource-directory-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+  </body>
+</html>

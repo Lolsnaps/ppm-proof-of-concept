@@ -1,0 +1,381 @@
+/*
+  Shared component and utility styles.
+
+  This file exists so the Content Security Policy no longer needs
+  style-src 'unsafe-inline'. Two things forced that allowance, and both are here:
+
+    1. Three modules injected a <style> element at runtime. A browser treats that as
+       an inline style regardless of where the CSS was authored, so it required the
+       allowance just as much as a style attribute did. Those blocks are in the
+       components section below, unchanged.
+
+    2. Nine pages carried style="..." attributes - 84 of them, almost all column and
+       field widths. Inline style attributes are covered by style-src too, so each
+       distinct value became a utility class.
+
+  The utility classes are deliberately literal: .mw-145 is min-width:145px. They hold
+  sizing that was previously inline and nothing more. For anything new, prefer a
+  named class in the relevant page stylesheet - these are a migration aid, not a
+  design system.
+*/
+
+/* ================================================== components */
+
+/* ---- history modal and history button (was injected by ppm-change-log.js) ---- */
+.ppm-history-button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#5b294f;cursor:pointer;vertical-align:middle}
+.ppm-history-button:hover{border-color:#5b294f;background:#faf5ff}
+.ppm-history-button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.ppm-history-modal{display:none;position:fixed;inset:0;z-index:1400;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.55)}
+.ppm-history-modal.visible{display:flex}
+.ppm-history-card{display:flex;flex-direction:column;width:min(820px,100%);max-height:88vh;border-radius:12px;background:#fff;box-shadow:0 22px 50px rgba(15,23,42,.3);font-family:Arial,Helvetica,sans-serif;color:#172033}
+.ppm-history-head{padding:18px 20px;border-bottom:1px solid #dbe3ef}
+.ppm-history-head h3{margin:0;font-size:18px}
+.ppm-history-head p{margin:6px 0 0;color:#64748b;font-size:12px}
+.ppm-history-body{flex:1;overflow:auto;padding:18px 20px;background:#f8fafc}
+.ppm-history-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid #dbe3ef;background:#fff}
+.ppm-history-foot a{color:#5b294f;font-size:12px;font-weight:700}
+.ppm-history-close{padding:9px 16px;border:0;border-radius:7px;background:#9ddcf9;color:#3f1937;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+.ppm-history-event{margin-bottom:12px;border:1px solid #dbe3ef;border-left:4px solid #5b294f;border-radius:9px;background:#fff}
+.ppm-history-event:last-child{margin-bottom:0}
+.ppm-history-meta{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding:12px 14px;border-bottom:1px solid #eef2f7}
+.ppm-history-action{padding:4px 9px;border-radius:999px;background:#ede9fe;color:#5b21b6;font-size:10px;font-weight:900}
+.ppm-history-when{font-size:12px;font-weight:800}
+.ppm-history-who{color:#64748b;font-size:11px}
+.ppm-history-summary{padding:0 14px 12px;color:#475569;font-size:12px;line-height:1.5}
+.ppm-history-cells{width:100%;border-collapse:collapse}
+.ppm-history-cells th,.ppm-history-cells td{padding:8px 14px;border-top:1px solid #eef2f7;text-align:left;font-size:11px;vertical-align:top;overflow-wrap:anywhere}
+.ppm-history-cells th{width:26%;color:#475569;font-weight:800;background:#fbfcfe}
+.ppm-history-old{color:#991b1b;text-decoration:line-through}
+.ppm-history-new{color:#166534;font-weight:700}
+.ppm-history-empty{padding:34px 16px;color:#64748b;text-align:center;font-size:13px}
+
+/* ---- storage warning banner and quota dialog (was injected by ppm-data-safety.js) ---- */
+.ppm-storage-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 15px;border:1px solid #fcd34d;border-left:5px solid #d97706;border-radius:8px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.5}
+.ppm-storage-banner.urgent{border-color:#fca5a5;border-left-color:#dc2626;background:#fef2f2;color:#991b1b}
+.ppm-storage-banner b{font-weight:800}
+.ppm-storage-banner a{margin-left:auto;color:inherit;font-weight:800;white-space:nowrap}
+.ppm-storage-full{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.6)}
+.ppm-storage-full-card{width:min(560px,100%);padding:24px 26px;border-radius:12px;background:#fff;box-shadow:0 24px 60px rgba(15,23,42,.35);font-family:Arial,Helvetica,sans-serif;color:#172033}
+.ppm-storage-full-card h2{margin:0 0 12px;color:#991b1b;font-size:20px}
+.ppm-storage-full-card p{margin:0 0 12px;font-size:13px;line-height:1.6}
+.ppm-storage-full-card ol{margin:0 0 18px;padding-left:20px;font-size:13px;line-height:1.7}
+.ppm-storage-full-actions{display:flex;gap:9px;flex-wrap:wrap}
+.ppm-storage-full-actions button{padding:10px 15px;border:0;border-radius:7px;background:#9ddcf9;color:#3f1937;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+.ppm-storage-full-actions button.secondary{border:1px solid #cbd5e1;background:#fff;color:#334155}
+
+/* ---- quick-add person dialog (was injected by ppm-resource-utils.js) ---- */
+.ppm-quick-person-backdrop { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; padding: 20px; background: rgba(15, 23, 42, 0.68); }
+.ppm-quick-person-backdrop.visible { display: flex; }
+.ppm-quick-person-dialog { width: min(520px, 100%); overflow: hidden; border-radius: 12px; background: white; box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35); }
+.ppm-quick-person-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
+.ppm-quick-person-header h2 { margin: 0; font-size: 20px; }
+.ppm-quick-person-header p { margin: 6px 0 0; color: #64748b; font-size: 13px; line-height: 1.5; }
+.ppm-quick-person-close { border: 0; background: transparent; color: #64748b; font-size: 26px; cursor: pointer; }
+.ppm-quick-person-body { padding: 22px 24px; }
+.ppm-quick-person-field { margin-bottom: 16px; }
+.ppm-quick-person-field:last-child { margin-bottom: 0; }
+.ppm-quick-person-field label { display: block; margin-bottom: 7px; color: #172033; font-size: 13px; font-weight: 700; }
+.ppm-quick-person-field input { width: 100%; padding: 10px 11px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #172033; font: inherit; }
+.ppm-quick-person-field input:focus { border-color: #2563eb; outline: 3px solid rgba(37, 99, 235, 0.15); }
+.ppm-quick-person-message { display: none; margin: 0 24px 18px; padding: 10px 12px; border: 1px solid #fca5a5; border-radius: 6px; background: #fee2e2; color: #991b1b; font-size: 13px; }
+.ppm-quick-person-message.visible { display: block; }
+.ppm-quick-person-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 18px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.ppm-quick-person-button { padding: 10px 15px; border: 0; border-radius: 7px; background: #2563eb; color: white; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.ppm-quick-person-button.secondary { border: 1px solid #cbd5e1; background: white; color: #334155; }
+@media (max-width: 560px) { .ppm-quick-person-footer { flex-direction: column-reverse; } .ppm-quick-person-button { width: 100%; } }
+
+/* =================================================== utilities */
+
+.flush{padding:0;border:0}
+.fs-16{font-size:16px}
+.inline-action{margin:13px 18px;color:#1d4ed8;font-size:12px;font-weight:800;cursor:pointer}
+.is-hidden{display:none}
+.m-0{margin:0}
+.mb-16{margin-bottom:16px}
+.mt-24{margin-top:24px}
+.mw-100{min-width:100px}
+.mw-120{min-width:120px}
+.mw-130{min-width:130px}
+.mw-135{min-width:135px}
+.mw-145{min-width:145px}
+.mw-155{min-width:155px}
+.mw-165{min-width:165px}
+.mw-170{min-width:170px}
+.mw-175{min-width:175px}
+.mw-185{min-width:185px}
+.mw-190{min-width:190px}
+.mw-200{min-width:200px}
+.mw-205{min-width:205px}
+.mw-210{min-width:210px}
+.mw-215{min-width:215px}
+.mw-225{min-width:225px}
+.mw-230{min-width:230px}
+.mw-240{min-width:240px}
+.mw-270{min-width:270px}
+.mw-320{min-width:320px}
+.panel-inset{margin:0 19px 14px}
+.panel-strip{padding:15px 19px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#f8fafc}
+.report-gap{margin:16px 19px 0}
+.required-mark{color:#b91c1c}
+.w-110{width:110px}
+.w-130{width:130px}
+.w-150{width:150px}
+.w-170{width:170px}
+.w-180{width:180px}
+.w-190{width:190px}
+.w-200{width:200px}
+.w-230{width:230px}
+.w-260{width:260px}
+.w-280{width:280px}
+.w-300{width:300px}
+.w-340{width:340px}
+.w-580{width:580px}
+.w-75{width:75px}
+.w-78{width:78px}
+.w-auto{width:auto}
+.xw-420{max-width:420px}
+.xw-520{max-width:520px}
+
+/* ============================================ loading states
+
+   THE PROBLEM
+
+   Every page renders its shell immediately, then waits for the database adapters to
+   hydrate before ppm-page-loader.js runs the page scripts that fill it in. So there is a
+   window - short on a warm cache, noticeably longer on a cold one - where the page is
+   fully drawn and completely empty. That reads as "broken", not as "loading".
+
+   THE APPROACH
+
+   <html> carries class="ppm-loading" in the markup, so the loading state is active from
+   the very first paint with no script needed. ppm-page-loader.js removes it when the
+   page is genuinely ready. Two things happen while it is present: a progress bar under
+   the nav, and a skeleton standing in for the content.
+
+   Timings are deliberate:
+     - the skeleton appears only after 120ms, so a fast load shows nothing at all rather
+       than a flash of grey
+     - once shown it stays for at least 300ms, because a skeleton that vanishes
+       instantly is more distracting than no skeleton
+     - after 12s the loader swaps to a message, since a skeleton that never resolves is
+       a lie
+
+   prefers-reduced-motion is honoured throughout: the shimmer and the indeterminate bar
+   become static, which still communicates "not ready" without movement.
+-------------------------------------------------------------------------- */
+
+/* The bar sits directly under the nav and does not affect layout. */
+.ppm-progress {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  height: 3px;
+  overflow: hidden;
+  background: #e8edf4;
+}
+
+.ppm-progress-fill {
+  height: 100%;
+  width: 40%;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(90deg, #9ddcf9, #5b294f);
+  animation: ppm-progress-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes ppm-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+
+/* Removed rather than hidden when ready, so nothing keeps animating off-screen. */
+html:not(.ppm-loading) .ppm-progress {
+  display: none;
+}
+
+/* --------------------------------------------------------- the skeleton */
+
+/*
+  While loading, the real content is hidden and the skeleton takes its place. Hidden
+  rather than dimmed: a half-visible table of stale or empty rows invites people to read
+  numbers that are not there yet.
+*/
+html.ppm-loading main > *:not(.ppm-skeleton) {
+  display: none;
+}
+
+.ppm-skeleton {
+  padding: 4px 0 0;
+}
+
+/* Nothing shows for the first 120ms, so a warm load stays clean. */
+.ppm-skeleton-inner {
+  opacity: 0;
+  animation: ppm-skeleton-in 200ms ease-out 120ms forwards;
+}
+
+@keyframes ppm-skeleton-in {
+  to { opacity: 1; }
+}
+
+.ppm-skeleton-heading {
+  width: 260px;
+  height: 26px;
+  margin: 10px 0 6px;
+  border-radius: 7px;
+}
+
+.ppm-skeleton-sub {
+  width: 420px;
+  max-width: 70%;
+  height: 13px;
+  margin: 0 0 24px;
+  border-radius: 5px;
+}
+
+.ppm-skeleton-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0 0 26px;
+}
+
+.ppm-skeleton-card {
+  flex: 1 1 170px;
+  height: 74px;
+  border: 1px solid #e6ebf1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 14px 16px;
+}
+
+.ppm-skeleton-card-label {
+  width: 66%;
+  height: 10px;
+  margin: 0 0 12px;
+  border-radius: 4px;
+}
+
+.ppm-skeleton-card-value {
+  width: 40%;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.ppm-skeleton-panel {
+  border: 1px solid #e6ebf1;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.ppm-skeleton-panel-head {
+  padding: 15px 18px;
+  border-bottom: 1px solid #eef1f5;
+  background: #f8fafc;
+}
+
+.ppm-skeleton-panel-title {
+  width: 200px;
+  height: 14px;
+  border-radius: 5px;
+}
+
+.ppm-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 18px;
+  border-bottom: 1px solid #f2f5f8;
+}
+
+.ppm-skeleton-row:last-child {
+  border-bottom: 0;
+}
+
+.ppm-skeleton-cell {
+  height: 11px;
+  border-radius: 4px;
+}
+
+/* Uneven widths read as a table of real records rather than a loading graphic. */
+.ppm-skeleton-cell.w1 { flex: 0 0 88px; }
+.ppm-skeleton-cell.w2 { flex: 1 1 30%; }
+.ppm-skeleton-cell.w3 { flex: 0 0 108px; }
+.ppm-skeleton-cell.w4 { flex: 0 0 72px; }
+.ppm-skeleton-cell.w5 { flex: 1 1 18%; }
+
+/* Successive rows fade slightly, so the eye reads top-down rather than as a solid block. */
+.ppm-skeleton-row:nth-child(3) { opacity: 0.85; }
+.ppm-skeleton-row:nth-child(4) { opacity: 0.7; }
+.ppm-skeleton-row:nth-child(5) { opacity: 0.55; }
+.ppm-skeleton-row:nth-child(6) { opacity: 0.4; }
+
+/* The shimmer itself, shared by every grey block above. */
+.ppm-skeleton-heading,
+.ppm-skeleton-sub,
+.ppm-skeleton-card-label,
+.ppm-skeleton-card-value,
+.ppm-skeleton-panel-title,
+.ppm-skeleton-cell {
+  background: linear-gradient(90deg, #eaeef3 25%, #f4f7fa 37%, #eaeef3 63%);
+  background-size: 400% 100%;
+  animation: ppm-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes ppm-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* ------------------------------------------------ slow and failed loads */
+
+.ppm-loading-message {
+  margin: 26px 0 0;
+  padding: 14px 17px;
+  border-left: 5px solid #d97706;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.ppm-loading-message.failed {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.ppm-loading-message b {
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* --------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .ppm-progress-fill {
+    width: 100%;
+    animation: none;
+  }
+  .ppm-skeleton-inner {
+    opacity: 1;
+    animation: none;
+  }
+  .ppm-skeleton-heading,
+  .ppm-skeleton-sub,
+  .ppm-skeleton-card-label,
+  .ppm-skeleton-card-value,
+  .ppm-skeleton-panel-title,
+  .ppm-skeleton-cell {
+    background: #eaeef3;
+    animation: none;
+  }
+}
+
+@media print {
+  .ppm-progress,
+  .ppm-skeleton {
+    display: none;
+  }
+}

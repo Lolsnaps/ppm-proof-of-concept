@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+    <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+    <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+    <script src="ppm-core.js?v=2026.08.09.11"></script>
+    <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+    <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+    <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+    <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+    <title>Administration | Foresters Portfolio</title>
+    <link rel="stylesheet" href="administration-page.css?v=2026.08.09.11" />
+  </head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Internal project and portfolio management prototype</p>
+    </header>
+    <nav aria-label="Primary navigation">
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html">Registers</a><a href="benefits-management.html">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="administration.html" class="active">Administration</a
+      ><a href="search.html" class="nav-search" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div id="readOnlyNote" class="read-only-note">
+        Read-only access: only authorised system and portfolio administrators can change configuration.
+      </div>
+      <div class="page-heading">
+        <div>
+          <h2>Administration and governance</h2>
+          <p>
+            Maintain the portfolio structure, lifecycle routes, validation rules, reporting periods and
+            calculation thresholds used throughout the PPM tool.
+          </p>
+        </div>
+        <a class="button light" href="audit-history.html">View configuration history</a>
+      </div>
+
+      <div class="tab-list" role="tablist" aria-label="Administration areas">
+        <button class="tab-button active" type="button" data-tab="overview">Overview</button>
+        <button class="tab-button" type="button" data-tab="portfolios">Portfolios</button>
+        <button class="tab-button" type="button" data-tab="lifecycles">Lifecycle templates</button>
+        <button class="tab-button" type="button" data-tab="mandatory">Mandatory fields</button>
+        <button class="tab-button" type="button" data-tab="references">Reference data</button>
+        <button class="tab-button" type="button" data-tab="rag">RAG thresholds</button>
+        <button class="tab-button" type="button" data-tab="calendars">Reporting calendars</button>
+        <button class="tab-button" type="button" data-tab="data">Data and backup</button>
+      </div>
+
+      <section id="panel-overview" class="tab-panel active">
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-label">Active portfolios</div>
+            <div id="summaryPortfolios" class="summary-value">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Lifecycle templates</div>
+            <div id="summaryTemplates" class="summary-value">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Active lifecycle stages</div>
+            <div id="summaryStages" class="summary-value">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Mandatory field rules</div>
+            <div id="summaryRules" class="summary-value">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Reference values</div>
+            <div id="summaryReferences" class="summary-value">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Open reporting periods</div>
+            <div id="summaryPeriods" class="summary-value">0</div>
+          </div>
+        </div>
+        <div class="overview-grid">
+          <article class="overview-card">
+            <h3>Portfolio structure</h3>
+            <p>
+              Define the accountable owner, sponsor, budget, reporting cycle and default lifecycle for each
+              portfolio.
+            </p>
+            <button type="button" class="button small" data-open-tab="portfolios">Manage portfolios</button>
+          </article>
+          <article class="overview-card">
+            <h3>Lifecycle routes</h3>
+            <p>
+              Use different stage sequences by project type and retain the previous version whenever a live
+              template changes.
+            </p>
+            <button type="button" class="button small" data-open-tab="lifecycles">Manage lifecycles</button>
+          </article>
+          <article class="overview-card">
+            <h3>Progressive validation</h3>
+            <p>
+              Choose which project fields become mandatory at each lifecycle stage, including project-type
+              exceptions.
+            </p>
+            <button type="button" class="button small" data-open-tab="mandatory">Manage field rules</button>
+          </article>
+          <article class="overview-card">
+            <h3>Consistent picklists</h3>
+            <p>
+              Maintain the controlled values shown in project, plan, RAID, benefit and reporting picklists.
+            </p>
+            <button type="button" class="button small" data-open-tab="references">
+              Manage reference data
+            </button>
+          </article>
+          <article class="overview-card">
+            <h3>RAG calculations</h3>
+            <p>
+              Set schedule, financial and resource tolerances used by calculated project health and exception
+              reporting.
+            </p>
+            <button type="button" class="button small" data-open-tab="rag">Manage thresholds</button>
+          </article>
+          <article class="overview-card">
+            <h3>Reporting control</h3>
+            <p>
+              Create reporting periods, due dates and locks so approved reports remain tied to a controlled
+              calendar.
+            </p>
+            <button type="button" class="button small" data-open-tab="calendars">Manage calendars</button>
+          </article>
+        </div>
+      </section>
+
+      <section id="panel-portfolios" class="tab-panel">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Portfolio records</h3>
+              <p>PPM-PORT-002: accountable ownership, objectives, budget and portfolio-wide defaults.</p>
+            </div>
+            <button
+              id="addPortfolioButton"
+              class="button portfolio-edit-control"
+              data-permission="portfolios.edit"
+              type="button"
+            >
+              Add portfolio
+            </button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Portfolio</th>
+                  <th>Owner</th>
+                  <th>Executive sponsor</th>
+                  <th>Status</th>
+                  <th>Budget</th>
+                  <th>Default lifecycle</th>
+                  <th>Reporting</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="portfolioRows"></tbody>
+            </table>
+          </div>
+          <div id="portfolioEmpty" class="empty" hidden>No portfolio records are available.</div>
+        </div>
+      </section>
+
+      <section id="panel-lifecycles" class="tab-panel">
+        <div class="split-layout">
+          <div class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>Templates</h3>
+                <p>Select a lifecycle to maintain its stages.</p>
+              </div>
+              <button
+                id="addTemplateButton"
+                class="button small admin-edit"
+                type="button"
+                data-permission="administration.edit"
+              >
+                Add template
+              </button>
+            </div>
+            <div class="panel-body"><div id="templateList" class="template-list"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3 id="templateEditorTitle">Lifecycle template</h3>
+                <p>
+                  Saving a changed live template creates a new version and retains its previous stage
+                  definition.
+                </p>
+              </div>
+              <div class="heading-actions">
+                <span id="templateVersionBadge" class="badge plum">Version 1</span
+                ><button
+                  id="retireTemplateButton"
+                  class="button danger small admin-edit"
+                  type="button"
+                  data-permission="administration.edit"
+                >
+                  Retire
+                </button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="templateId">Template ID</label><input id="templateId" readonly />
+                </div>
+                <div class="field two">
+                  <label for="templateName">Template name</label
+                  ><input id="templateName" class="admin-input" maxlength="160" />
+                </div>
+                <div class="field">
+                  <label for="templateEffectiveFrom">Effective from</label
+                  ><input id="templateEffectiveFrom" class="admin-input" type="date" />
+                </div>
+                <div class="field full">
+                  <label for="templateDescription">Description</label
+                  ><textarea id="templateDescription" class="admin-input"></textarea>
+                </div>
+                <div class="field two">
+                  <label for="templateProjectTypes">Applicable project types</label
+                  ><select id="templateProjectTypes" class="admin-input" multiple size="5"></select>
+                  <p class="help">Select “All project types” for the default route.</p>
+                </div>
+                <div class="field">
+                  <div class="checkbox-line">
+                    <input id="templateDefault" class="admin-input" type="checkbox" /><label
+                      for="templateDefault"
+                      >Default lifecycle</label
+                    >
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="checkbox-line">
+                    <input id="templateActive" class="admin-input" type="checkbox" /><label
+                      for="templateActive"
+                      >Active template</label
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="section-heading panel-strip"
+            >
+              <div>
+                <h3>Lifecycle stages</h3>
+                <p>Drag-free sequencing: change the order number, then save the template.</p>
+              </div>
+              <button
+                id="addStageButton"
+                type="button"
+                class="button small admin-edit"
+                data-permission="administration.edit"
+              >
+                Add stage
+              </button>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="w-75">Order</th>
+                    <th>Stage name</th>
+                    <th>Stage ID</th>
+                    <th>Gate required</th>
+                    <th>Gate name</th>
+                    <th>Description</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="stageRows"></tbody>
+              </table>
+            </div>
+            <div class="section-footer">
+              <button
+                id="saveTemplateButton"
+                type="button"
+                class="button admin-edit"
+                data-permission="administration.edit"
+              >
+                Save lifecycle template
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-mandatory" class="tab-panel">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Stage-dependent mandatory fields</h3>
+              <p>PPM-PRJ-002 and PPM-GOV-001: information becomes compulsory as the project advances.</p>
+            </div>
+            <button
+              id="addRuleButton"
+              class="button admin-edit"
+              type="button"
+              data-permission="administration.edit"
+            >
+              Add field rule
+            </button>
+          </div>
+          <div class="toolbar">
+            <div>
+              <label for="ruleTemplateFilter">Lifecycle template</label
+              ><select id="ruleTemplateFilter"></select>
+            </div>
+            <div>
+              <label for="ruleProjectTypeFilter">Project type</label
+              ><select id="ruleProjectTypeFilter"></select>
+            </div>
+            <div>
+              <label for="ruleStageFilter">Lifecycle stage</label
+              ><select id="ruleStageFilter"></select>
+            </div>
+            <div>
+              <button
+                id="saveRulesButton"
+                class="button admin-edit"
+                type="button"
+                data-permission="administration.edit"
+              >
+                Save mandatory field rules
+              </button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Field ID</th>
+                  <th>End-user label</th>
+                  <th>Required</th>
+                  <th>Guidance at this stage</th>
+                  <th>Active</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="ruleRows"></tbody>
+            </table>
+          </div>
+          <div id="ruleEmpty" class="empty" hidden>
+            No field rules apply to this stage and project type. Add a rule to begin progressive validation.
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-references" class="tab-panel">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Reference data and controlled picklists</h3>
+              <p>Maintain shared terminology without changing individual page code.</p>
+            </div>
+            <button
+              id="addReferenceButton"
+              class="button admin-edit"
+              type="button"
+              data-permission="administration.edit"
+            >
+              Add value
+            </button>
+          </div>
+          <div class="toolbar">
+            <div class="field two">
+              <label for="referenceCategory">Reference-data category</label
+              ><select id="referenceCategory"></select>
+            </div>
+            <div></div>
+            <div>
+              <button
+                id="saveReferencesButton"
+                class="button admin-edit"
+                type="button"
+                data-permission="administration.edit"
+              >
+                Save reference data
+              </button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Value ID</th>
+                  <th>Code</th>
+                  <th>Display label</th>
+                  <th>Stored value</th>
+                  <th>Order</th>
+                  <th>Active</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="referenceRows"></tbody>
+            </table>
+          </div>
+          <div id="referenceEmpty" class="empty" hidden>No values exist in this category.</div>
+        </div>
+      </section>
+
+      <section id="panel-rag" class="tab-panel">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Calculated RAG thresholds</h3>
+              <p>
+                These values feed the existing project RAG, resource-capacity and financial-variance
+                calculations.
+              </p>
+            </div>
+            <span class="badge plum">Shared configuration</span>
+          </div>
+          <div class="panel-body">
+            <div class="rag-grid">
+              <div class="rag-card">
+                <h4>Schedule tolerance</h4>
+                <div class="field">
+                  <label for="scheduleAmberToleranceDays">Amber after baseline (days)</label
+                  ><input
+                    id="scheduleAmberToleranceDays"
+                    class="rag-input admin-input"
+                    type="number"
+                    min="0"
+                  />
+                </div>
+                <div class="field">
+                  <label for="scheduleRedToleranceDays">Red after baseline (days)</label
+                  ><input id="scheduleRedToleranceDays" class="rag-input admin-input" type="number" min="1" />
+                </div>
+              </div>
+              <div class="rag-card">
+                <h4>Resource utilisation</h4>
+                <div class="field">
+                  <label for="resourceAmberUtilisation">Amber threshold (%)</label
+                  ><input id="resourceAmberUtilisation" class="rag-input admin-input" type="number" min="1" />
+                </div>
+                <div class="field">
+                  <label for="resourceRedUtilisation">Red threshold (%)</label
+                  ><input id="resourceRedUtilisation" class="rag-input admin-input" type="number" min="1" />
+                </div>
+                <div class="field">
+                  <label for="underUtilisationThreshold">Under-utilisation (%)</label
+                  ><input
+                    id="underUtilisationThreshold"
+                    class="rag-input admin-input"
+                    type="number"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+              </div>
+              <div class="rag-card">
+                <h4>Financial variance</h4>
+                <div class="field">
+                  <label for="financialAmberVariance">Amber variance (%)</label
+                  ><input id="financialAmberVariance" class="rag-input admin-input" type="number" min="0" />
+                </div>
+                <div class="field">
+                  <label for="financialRedVariance">Red variance (%)</label
+                  ><input id="financialRedVariance" class="rag-input admin-input" type="number" min="1" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="section-footer">
+            <button
+              id="saveRagButton"
+              class="button admin-edit"
+              type="button"
+              data-permission="administration.edit"
+            >
+              Save RAG thresholds
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-calendars" class="tab-panel">
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Reporting calendars</h3>
+              <p>Define the reporting cadence and due-date rule used to create controlled periods.</p>
+            </div>
+            <button
+              id="addCalendarButton"
+              class="button admin-edit"
+              type="button"
+              data-permission="administration.edit"
+            >
+              Add calendar
+            </button>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Calendar</th>
+                  <th>Portfolio</th>
+                  <th>Frequency</th>
+                  <th>Due offset</th>
+                  <th>Financial year</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="calendarRows"></tbody>
+            </table>
+          </div>
+          <div id="calendarEmpty" class="empty" hidden>No reporting calendars are available.</div>
+        </div>
+        <div class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3 id="periodHeading">Reporting periods</h3>
+              <p>Create due dates, close completed periods and lock approved reporting records.</p>
+            </div>
+            <div class="heading-actions">
+              <label class="m-0" for="generateCount">Periods to create</label
+              ><input
+                id="generateCount"
+                class="admin-input w-78"
+                type="number"
+                min="1"
+                max="104"
+                value="12"
+              /><button
+                id="generatePeriodsButton"
+                class="button small admin-edit"
+                type="button"
+                data-permission="administration.edit"
+              >
+                Generate periods</button
+              ><button
+                id="addPeriodButton"
+                class="button light small admin-edit"
+                type="button"
+                data-permission="administration.edit"
+              >
+                Add period
+              </button>
+            </div>
+          </div>
+          <div class="toolbar">
+            <div class="field two">
+              <label for="periodCalendarFilter">Reporting calendar</label
+              ><select id="periodCalendarFilter"></select>
+            </div>
+            <div></div>
+            <div>
+              <button
+                id="savePeriodsButton"
+                class="button admin-edit"
+                type="button"
+                data-permission="administration.edit"
+              >
+                Save reporting periods
+              </button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Start</th>
+                  <th>Finish</th>
+                  <th>Submission due</th>
+                  <th>Status</th>
+                  <th>Locked</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="periodRows"></tbody>
+            </table>
+          </div>
+          <div id="periodEmpty" class="empty" hidden>
+            No periods exist for this calendar. Generate periods or add one manually.
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-data" class="tab-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Data and backup</h3>
+            <p>
+              Everything in this tool is held in this browser. Clearing browsing data, a rebuilt laptop or a
+              new machine takes it all with it, and there is no copy on a server. Download a backup regularly
+              and keep it somewhere the organisation backs up, such as OneDrive or a team SharePoint folder.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Storage in use</h4>
+          <p class="card-help">
+            Browsers allow roughly 5 MB. Once that is full nothing more can be saved, so keep an eye on this
+            figure and archive the audit history when it grows.
+          </p>
+          <div id="storageMeter" class="storage-meter">
+            <div id="storageMeterFill" class="storage-meter-fill"></div>
+          </div>
+          <p id="storageSummary" class="storage-summary">Checking storage…</p>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data set</th>
+                  <th>Records</th>
+                  <th>Size</th>
+                  <th>Share of storage</th>
+                </tr>
+              </thead>
+              <tbody id="storageRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Download a backup</h4>
+          <p class="card-help">
+            Produces a single file containing every project, plan, milestone, RAID item, register, benefit,
+            financial record, stage gate, configuration setting and audit event. Personal items such as your
+            sign-in session are not included.
+          </p>
+          <p class="card-help warning">
+            The file contains no passwords — sign-in is handled by Supabase Auth — but it does include
+            people, roles and portfolio data, so store it as confidentially as the tool itself.
+          </p>
+          <button
+            id="downloadBackupButton"
+            type="button"
+            class="button"
+            data-permission="administration.edit"
+          >
+            Download full backup
+          </button>
+          <span id="backupResult" class="inline-result"></span>
+        </div>
+
+        <div class="card">
+          <h4>Archive audit history</h4>
+          <p class="card-help">
+            Audit history grows with every saved edit and is usually the largest thing stored. Archiving
+            downloads the older events as their own file and then removes them from the browser, freeing
+            space. Nothing is removed until the file has been produced.
+          </p>
+          <div class="archive-controls">
+            <label for="archiveKeep">Keep the most recent</label>
+            <select id="archiveKeep">
+              <option value="250">250 events</option>
+              <option value="500" selected>500 events</option>
+              <option value="1000">1,000 events</option>
+              <option value="2000">2,000 events</option>
+            </select>
+            <button
+              id="archiveAuditButton"
+              type="button"
+              class="button light"
+              data-permission="administration.edit"
+            >
+              Archive older events
+            </button>
+          </div>
+          <span id="archiveResult" class="inline-result"></span>
+        </div>
+
+        <div class="card danger-card">
+          <h4>Restore from a backup</h4>
+          <p class="card-help">
+            Replaces everything currently in this browser with the contents of a backup file. Use it to move
+            the portfolio to a new machine, or to recover after data has been lost.
+          </p>
+          <p class="card-help warning">
+            This cannot be undone. Download a backup of what is here now before restoring.
+          </p>
+          <input
+            id="restoreFile"
+            type="file"
+            accept="application/json,.json"
+            data-permission="administration.edit"
+          />
+          <div id="restorePreview" class="restore-preview" hidden></div>
+          <div id="restoreConfirmRow" class="archive-controls" hidden>
+            <label for="restoreConfirm">Type <b>RESTORE</b> to confirm</label>
+            <input id="restoreConfirm" type="text" placeholder="RESTORE" autocomplete="off" />
+            <button
+              id="restoreButton"
+              type="button"
+              class="button danger"
+              disabled
+              data-permission="administration.edit"
+            >
+              Replace all data
+            </button>
+          </div>
+          <span id="restoreResult" class="inline-result"></span>
+        </div>
+      </section>
+    </main>
+
+    <div
+      id="portfolioModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="portfolioModalTitle"
+    >
+      <div class="modal">
+        <form id="portfolioForm" data-permission="portfolios.edit">
+          <div class="modal-header">
+            <div>
+              <h3 id="portfolioModalTitle">Portfolio record</h3>
+              <p>Maintain ownership, objectives, budget and delivery defaults.</p>
+            </div>
+            <button id="closePortfolioModal" class="modal-close" type="button" aria-label="Close">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="field-grid">
+              <div class="field">
+                <label for="portfolioId">Portfolio ID</label><input id="portfolioId" readonly />
+              </div>
+              <div class="field two">
+                <label for="portfolioName">Portfolio name</label
+                ><input id="portfolioName" class="admin-input" required maxlength="160" />
+              </div>
+              <div class="field">
+                <label for="portfolioStatus">Status</label
+                ><select id="portfolioStatus" class="admin-input">
+                  <option>Active</option>
+                  <option>Inactive</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="portfolioDescription">Description</label
+                ><textarea id="portfolioDescription" class="admin-input"></textarea>
+              </div>
+              <div class="field two">
+                <label for="portfolioOwner">Portfolio owner</label
+                ><select id="portfolioOwner" class="admin-input">
+                  <option value="">Select an owner</option>
+                </select>
+              </div>
+              <div class="field two">
+                <label for="portfolioSponsor">Executive sponsor</label
+                ><select id="portfolioSponsor" class="admin-input">
+                  <option value="">Select a sponsor</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="portfolioBudget">Portfolio budget (£)</label
+                ><input id="portfolioBudget" class="admin-input" type="number" min="0" step="0.01" />
+              </div>
+              <div class="field">
+                <label for="portfolioFinancialYear">Financial year starts</label
+                ><select id="portfolioFinancialYear" class="admin-input">
+                  <option value="1">January</option>
+                  <option value="4">April</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="portfolioFinancialYearName">Current financial year</label
+                ><input id="portfolioFinancialYearName" class="admin-input" placeholder="2026/27" />
+              </div>
+              <div class="field">
+                <label for="portfolioLifecycle">Default lifecycle</label
+                ><select id="portfolioLifecycle" class="admin-input"></select>
+              </div>
+              <div class="field">
+                <label for="portfolioReportingFrequency">Default reporting frequency</label
+                ><select id="portfolioReportingFrequency" class="admin-input"></select>
+              </div>
+              <div class="field two">
+                <label for="portfolioCalendar">Reporting calendar</label
+                ><select id="portfolioCalendar" class="admin-input"></select>
+              </div>
+              <div class="field two">
+                <label for="portfolioPeriod">Current reporting period</label
+                ><select id="portfolioPeriod" class="admin-input"></select>
+              </div>
+              <div class="field two">
+                <label for="portfolioProgrammes">Associated programmes / workstreams</label
+                ><select id="portfolioProgrammes" class="admin-input" multiple size="5"></select>
+                <p class="help">Use Ctrl or Cmd to select more than one programme.</p>
+              </div>
+              <div class="field two">
+                <label for="portfolioObjectives">Portfolio objectives</label
+                ><textarea id="portfolioObjectives" class="admin-input"></textarea>
+              </div>
+              <div class="field full">
+                <label for="portfolioPriorities">Strategic priorities</label
+                ><textarea id="portfolioPriorities" class="admin-input"></textarea>
+              </div>
+              <div class="field">
+                <label for="portfolioRisks">Portfolio-level risks</label
+                ><textarea id="portfolioRisks" class="admin-input" placeholder="One risk per line"></textarea>
+              </div>
+              <div class="field">
+                <label for="portfolioIssues">Portfolio-level issues</label
+                ><textarea
+                  id="portfolioIssues"
+                  class="admin-input"
+                  placeholder="One issue per line"
+                ></textarea>
+              </div>
+              <div class="field two">
+                <label for="portfolioDependencies">Portfolio-level dependencies</label
+                ><textarea
+                  id="portfolioDependencies"
+                  class="admin-input"
+                  placeholder="One dependency per line"
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelPortfolioModal" type="button" class="button light">Cancel</button
+            ><button type="submit" class="button portfolio-edit-control" data-permission="portfolios.edit">
+              Save portfolio
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="calendarModal"
+      class="modal-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="calendarModalTitle"
+    >
+      <div class="modal">
+        <form id="calendarForm">
+          <div class="modal-header">
+            <div>
+              <h3 id="calendarModalTitle">Reporting calendar</h3>
+              <p>Set the cadence, financial-year boundary and report-submission due date.</p>
+            </div>
+            <button id="closeCalendarModal" class="modal-close" type="button" aria-label="Close">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="field-grid">
+              <div class="field">
+                <label for="calendarId">Calendar ID</label><input id="calendarId" readonly />
+              </div>
+              <div class="field two">
+                <label for="calendarName">Calendar name</label
+                ><input id="calendarName" class="admin-input" required maxlength="160" />
+              </div>
+              <div class="field">
+                <label for="calendarPortfolio">Portfolio</label
+                ><select id="calendarPortfolio" class="admin-input"></select>
+              </div>
+              <div class="field full">
+                <label for="calendarDescription">Description</label
+                ><textarea id="calendarDescription" class="admin-input"></textarea>
+              </div>
+              <div class="field">
+                <label for="calendarFrequency">Frequency</label
+                ><select id="calendarFrequency" class="admin-input">
+                  <option>Weekly</option>
+                  <option>Fortnightly</option>
+                  <option>Monthly</option>
+                  <option>Quarterly</option>
+                  <option>Annual</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="calendarDueOffset">Submission due after period end (days)</label
+                ><input id="calendarDueOffset" class="admin-input" type="number" min="0" value="5" />
+              </div>
+              <div class="field">
+                <label for="calendarFinancialYear">Financial year starts</label
+                ><select id="calendarFinancialYear" class="admin-input">
+                  <option value="1">January</option>
+                  <option value="4">April</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="checkbox-line">
+                  <input id="calendarDefault" class="admin-input" type="checkbox" /><label
+                    for="calendarDefault"
+                    >Default calendar</label
+                  >
+                </div>
+                <div class="checkbox-line">
+                  <input id="calendarActive" class="admin-input" type="checkbox" checked /><label
+                    for="calendarActive"
+                    >Active calendar</label
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancelCalendarModal" type="button" class="button light">Cancel</button
+            ><button type="submit" class="button admin-edit" data-permission="administration.edit">
+              Save calendar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="confirmationBubble"
+      class="confirmation-background"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirmationTitle"
+    >
+      <div class="confirmation">
+        <h3 id="confirmationTitle">Confirm change</h3>
+        <p id="confirmationMessage"></p>
+        <div class="confirmation-actions">
+          <button id="cancelConfirmation" type="button" class="button light">Cancel</button
+          ><button id="confirmAction" type="button" class="button danger" data-permission="programmes.edit">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-audit-utils.js?v=2026.08.09.11|ppm-change-log.js?v=2026.08.09.11|ppm-admin-utils.js?v=2026.08.09.11|administration-page.js?v=2026.08.09.11"></script>
+    
+    
+    
+  </body>
+</html>

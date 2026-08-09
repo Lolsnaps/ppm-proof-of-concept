@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" class="ppm-loading">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://qmfigesgkoirirgpgmse.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <link rel="stylesheet" href="ppm-nav.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-shared.css?v=2026.08.09.11" />
+  <link rel="stylesheet" href="ppm-auth.css?v=2026.08.09.11" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.2/dist/umd/supabase.js"
+            integrity="sha256-BLlX8lY6QNywKx2db3p6I5c7+OvkwUNb5f6vJL/5ETQ="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
+  <script src="ppm-supabase.js?v=2026.08.09.11"></script>
+  <script src="ppm-core.js?v=2026.08.09.11"></script>
+  <script src="ppm-data-safety.js?v=2026.08.09.11"></script>
+  <script src="ppm-auth-utils.js?v=2026.08.09.11"></script>
+  <script src="ppm-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-child-database.js?v=2026.08.09.11"></script>
+  <script src="ppm-notifications.js?v=2026.08.09.11"></script>
+  <title>Global Search | Foresters Portfolio</title>
+  <link rel="stylesheet" href="search-page.css?v=2026.08.09.11" />
+</head>
+  <body>
+    <header>
+      <h1>Foresters Portfolio</h1>
+      <p>Project, programme and portfolio management</p>
+    </header>
+    <nav>
+      <a href="index.html">Projects</a><a href="programme.html">Programmes</a
+      ><a href="milestones.html">Milestones</a><a href="raid-log.html">RAID Log</a
+      ><a href="registers.html">Registers</a><a href="benefits-management.html">Benefits</a
+      ><a href="resource-directory.html">Resources</a
+      ><a href="resource-management.html">Resource Management</a
+      ><a href="financial-management.html">Financials</a><a href="audit-history.html">Audit History</a
+      ><a href="reports.html">Reports &amp; Dashboards</a
+      ><a href="search.html" class="nav-search active" aria-label="Global search"
+        ><svg class="nav-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4-4"></path></svg
+        ><span>Search</span></a
+      >
+    </nav>
+    <main>
+      <div id="pageMessage" class="message" role="status"></div>
+      <div class="page-heading">
+        <div>
+          <h2>Global search</h2>
+          <p>
+            Search portfolios, lifecycle gates, projects, milestones, RAID, actions, decisions, benefits,
+            documents and financial records in one place. Matching is case-insensitive and supports partial
+            words.
+          </p>
+        </div>
+        <button id="refreshButton" type="button" class="button light">Refresh data</button>
+      </div>
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Search and filters</h3>
+            <p>Archived project records are excluded by default and can be included when needed.</p>
+          </div>
+        </div>
+        <form id="searchForm" class="search-grid">
+          <input
+            id="searchQuery"
+            type="search"
+            placeholder="Search portfolio, project ID, gate, person, RAID, benefit or financial record"
+            aria-label="Global search term"
+          />
+          <select id="typeFilter" aria-label="Record type">
+            <option value="">All record types</option>
+          </select>
+          <select id="projectFilter" aria-label="Project">
+            <option value="">All projects</option>
+          </select>
+          <select id="groupBy" aria-label="Group results">
+            <option value="">No grouping</option>
+            <option value="type">Record type</option>
+            <option value="programmeName">Programme</option>
+            <option value="projectCode">Project</option>
+          </select>
+          <select id="sortBy" aria-label="Sort results">
+            <option value="relevance">Relevance</option>
+            <option value="title">Title</option>
+            <option value="type">Record type</option>
+            <option value="updated">Recently updated</option>
+          </select>
+          <button type="submit" class="button">Search</button>
+          <select id="includeArchived" aria-label="Archived projects">
+            <option value="no">Exclude archived</option>
+            <option value="yes">Include archived</option>
+          </select>
+        </form>
+        <div class="recent">
+          <strong class="result-summary">Recent searches:</strong><span id="recentSearches"></span>
+        </div>
+        <div class="view-row">
+          <select id="savedViewSelector" aria-label="Saved search views">
+            <option value="">Current unsaved view</option></select
+          ><input id="viewName" type="text" maxlength="80" placeholder="Name this view" /><select
+            id="viewScope"
+            aria-label="View visibility"
+          >
+            <option value="personal">Personal view</option>
+            <option value="shared">Shared / published view</option></select
+          ><button id="saveViewButton" type="button" class="button" data-permission="views.publish">Save view</button
+          ><button id="deleteViewButton" type="button" class="button danger" disabled data-permission="views.publish">Delete view</button>
+        </div>
+        <div id="viewMeta" class="view-meta">Current view is not saved.</div>
+        <details>
+          <summary
+ class="inline-action"          >
+            Choose visible result columns
+          </summary>
+          <div id="columnOptions" class="options-row"></div>
+        </details>
+      </section>
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Results</h3>
+            <p id="resultSummary">Enter a search term or use filters to find portfolio records.</p>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead id="resultHead"></thead>
+            <tbody id="resultBody"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state">No records match this search.</div>
+      </section>
+    </main>
+    <div
+      id="deleteViewConfirmation"
+      class="confirmation-background"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="deleteViewTitle"
+    >
+      <div class="confirmation-bubble">
+        <h2 id="deleteViewTitle">Delete saved view?</h2>
+        <p id="deleteViewMessage"></p>
+        <div class="confirmation-actions">
+          <button id="cancelDeleteView" type="button" class="button light" data-permission="none">Keep view</button
+          ><button id="confirmDeleteView" type="button" class="button danger" data-permission="views.publish">Delete view</button>
+        </div>
+      </div>
+    </div>
+    <script src="ppm-page-loader.js?v=2026.08.09.11" data-ppm-scripts="ppm-register-utils.js?v=2026.08.09.11|search-page.js?v=2026.08.09.11"></script>
+    
+  </body>
+</html>
