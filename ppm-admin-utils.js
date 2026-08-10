@@ -1052,8 +1052,17 @@
     const rows = sourceRows
       .filter(Boolean)
       .map((row, index) => normaliseRule(row, index, templateVersions[row.templateId || "LIFE-00001"] || 1));
-    if (!Array.isArray(stored) || !stored.length || versionMigrationRequired)
-    /* Stage 16: derived only. seedDefaults() is what persists the defaults, once. */
+    /*
+      Stage 16: derived only. seedDefaults() persists the defaults, once.
+
+      The seeding write that used to be here was the body of a brace-less `if`. Replacing just
+      that line with a comment left the `if` with no body of its own, so `return clone(rows)`
+      became its body - and this function returned undefined whenever rules already existed,
+      which is every populated portfolio. Callers filter what it returns, so the project list
+      and the lifecycle readiness section both failed with "cannot read properties of undefined".
+      A condition with no braces is one careless edit from silently swallowing the next line.
+    */
+    void versionMigrationRequired;
     return clone(rows);
   }
 
