@@ -93,12 +93,44 @@
 
   /* ------------------------------------------------------------------ building */
 
+  /*
+    Everything this builds inherits the select's data-permission, for two separate reasons.
+
+    On the wrapper, because PPMAuth hides a control the user may not use by setting
+    data-ppm-permission-hidden on every [data-permission] element, and ppm-auth.css hides that
+    with display:none. The select is already hidden here, so without this the tick boxes would
+    stay on screen for somebody who is not allowed the field at all - additionalRoles carries
+    users.manage, so that is the access-control screen showing its access-control field to a
+    user who cannot have it. The database would still refuse the write; the screen should not
+    offer it.
+
+    On the two buttons, because PPMAuth fails closed on any button it judges to be a mutation
+    control with no tag, and it makes that judgement by matching the button's text against a
+    list of verbs. "Select all" and "Clear" happen not to match, so today they would be left
+    alone - but that is luck, not design, and renaming Clear to Reset would silently disable it.
+    Stating the permission takes the decision away from the wording.
+
+    Where the select has no data-permission - three of the four do not - the generated controls
+    get "none", which is PPMAuth's marker for a control that changes no data by itself. That is
+    the literal truth: a tick box here only sets option.selected on the select, and the select
+    is what the page reads and what any permission applies to.
+  */
+  function permissionOf(select) {
+    return select.getAttribute("data-permission") || "none";
+  }
+
   function build(select) {
+    var permission = permissionOf(select);
+
     var wrapper = document.createElement("div");
     wrapper.className = "ppm-picklist";
     wrapper.setAttribute("role", "group");
     wrapper.setAttribute("aria-label", label(select));
     if (select.id) wrapper.setAttribute(ENHANCED, select.id);
+    /* Only when the select actually declared one: tagging the wrapper "none" would be noise. */
+    if (select.hasAttribute("data-permission")) {
+      wrapper.setAttribute("data-permission", select.getAttribute("data-permission"));
+    }
 
     var bar = document.createElement("div");
     bar.className = "ppm-picklist-bar";
@@ -109,11 +141,13 @@
     var all = document.createElement("button");
     all.type = "button";
     all.className = "ppm-picklist-action";
+    all.setAttribute("data-permission", permission);
     all.textContent = "Select all";
 
     var none = document.createElement("button");
     none.type = "button";
     none.className = "ppm-picklist-action";
+    none.setAttribute("data-permission", permission);
     none.textContent = "Clear";
 
     bar.appendChild(count);
