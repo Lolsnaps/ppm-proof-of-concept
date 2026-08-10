@@ -1598,138 +1598,36 @@
     return parseJson(Storage.prototype.getItem.call(localStorage, key), fallback);
   }
 
-  function installWriteThrough() {
-    if (writeThroughInstalled) return;
-    writeThroughInstalled = true;
+  /* ============================================ Stage 16: the write-through is gone
 
-    const previousSetItem = Storage.prototype.setItem;
-    const byLocalKey = {};
-    Object.keys(WRITERS).forEach((name) => {
-      byLocalKey[MODULES[name].localKey] = name;
-    });
+     WHAT USED TO BE HERE
 
-    Storage.prototype.setItem = function (key, value) {
-      const result = previousSetItem.call(this, key, value);
-      if (this !== window.localStorage) return result;
+     installWriteThrough() replaced Storage.prototype.setItem for the whole page, and
+     installWriteGlobalSeam() wrapped PPMAuth.writeGlobal, so that ordinary-looking browser
+     storage writes were intercepted, diffed against a baseline and pushed to PostgreSQL.
 
-      const moduleName = byLocalKey[key];
-      if (!moduleName) return result;
+     It worked, and it was indefensible. A call to a browser API performed a network write that
+     no reader of the call site could see; the write returned before the database had been asked
+     anything, so a page could report success for a write PostgreSQL went on to refuse; and it
+     needed two independent interceptions to stay in step, which they did not - Stage 12's bug
+     was configuration saving locally and never reaching the database, silently, for weeks.
 
-      // Read back unfiltered, so what gets pushed is what was actually stored
-      // rather than the caller's scoped view of it.
-      let records;
-      try {
-        records = rawReadLocal(key, []);
-      } catch (error) {
-        return result;
-      }
-      if (!Array.isArray(records)) return result;
+     WHAT REPLACED IT
 
-      const changed = changedRecords(moduleName, records);
-      if (!changed.length) return result;
+     ppm-data.js. Every business write in the application goes through PPMStore, one row at a
+     time, awaited, returning a result the caller has to look at. Nothing patches any prototype.
 
-      // The caller is synchronous and cannot wait, so the push is scheduled and
-      // its outcome reported through the console and the pending log.
-      setTimeout(() => {
-        saveRecords(moduleName, changed)
-          .then((outcome) => {
-            if (outcome.saved.length) {
-              // saveRecord updates the in-memory databaseId/version metadata.
-              // Persist that metadata past the scoping/write-through wrappers so
-              // the next edit carries the version it actually loaded/saved.
-              rawSetLocal(key, JSON.stringify(records));
+     Three gates keep it that way: VERIFY-STATIC.mjs refuses any assignment to Storage.prototype,
+     refuses a business collection written to localStorage outside ppm-data.js, and refuses a
+     PPMStore write whose result is discarded.
 
-              // Only successful rows become clean. Failed/conflicted rows remain
-              // dirty and will be retried on the next save.
-              snapshotSaved(moduleName, records, outcome.saved);
-            }
-          })
-          .catch((error) => console.error("PPMDatabase: write-through failed unexpectedly.", error));
-      }, 0);
-
-      return result;
-    };
-
-    installWriteGlobalSeam();
-  }
-
-  /*
-    Seam two: PPMAuth.writeGlobal.
-
-    Until now this adapter patched only Storage.prototype.setItem, and the gap was
-    dormant rather than harmless: writeGlobal deliberately uses the unpatched setter
-    it captured at load time, so anything writing projects, programmes, portfolios or
-    people through it would have updated the browser mirror and never reached
-    PostgreSQL. No error, no pending entry - the change would simply be gone on the
-    next page load.
-
-    Nothing writes these four collections that way today. That is exactly why this is
-    worth closing now: the failure would first appear in whatever unrelated change
-    introduced such a write, and it would present as "the save works but does not
-    stick", which is the most expensive symptom in this codebase to trace.
-
-    The child adapter has carried this seam since Stage 12. This mirrors it.
+     Hydration still uses PPMAuth.rawSet to fill the browser mirror that pages read from. That is
+     a read path, not a write seam, and it goes when the reads are migrated.
   */
-  function installWriteGlobalSeam() {
-    const auth = window.PPMAuth;
-    if (!auth || typeof auth.writeGlobal !== "function") return;
-    if (auth.__ppmFoundationWriteGlobalWrapped) return;
 
-    const byLocalKey = {};
-    Object.keys(WRITERS).forEach((name) => {
-      byLocalKey[MODULES[name].localKey] = name;
-    });
-
-    const previousWriteGlobal = auth.writeGlobal;
-    auth.writeGlobal = function (key, value, reason) {
-      const result = previousWriteGlobal.call(this, key, value, reason);
-
-      const moduleName = byLocalKey[String(key)];
-      if (!moduleName) return result;
-
-      /*
-        Read back through the raw reader rather than trusting the value handed in:
-        writeGlobal callers sometimes pass a scoped or partial view, and what must be
-        pushed is what was actually stored.
-      */
-      let records;
-      try {
-        records = rawReadLocal(String(key), []);
-      } catch (error) {
-        return result;
-      }
-      if (!Array.isArray(records)) return result;
-
-      const changed = changedRecords(moduleName, records);
-      if (!changed.length) return result;
-
-      setTimeout(() => {
-        saveRecords(moduleName, changed)
-          .then((outcome) => {
-            if (outcome.saved.length) {
-              rawSetLocal(String(key), JSON.stringify(records));
-              snapshotSaved(moduleName, records, outcome.saved);
-            }
-          })
-          .catch((error) =>
-            console.error("PPMDatabase: writeGlobal write-through failed unexpectedly.", error)
-          );
-      }, 0);
-
-      return result;
-    };
-
-    /* Marked on the facade so a second adapter load cannot double-wrap and push
-       every change twice. */
-    auth.__ppmFoundationWriteGlobalWrapped = true;
-  }
-
-  /*
-    Runs on load, before page scripts read anything. Installs both write seams and
-    hydrates every collection.
-  */
+  /* Runs on load, before page scripts read anything. Hydration only now - there are no seams
+     left to install. */
   function boot() {
-    installWriteThrough();
     return hydrate().catch((error) => {
       console.error("PPMDatabase: hydration failed; the page is using local data.", error);
       return { hydrated: [], skipped: [], failed: [{ module: "all", error: String(error) }] };

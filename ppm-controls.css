@@ -404,3 +404,73 @@ input[type="number"] {
   font-size: 12px;
   text-align: center;
 }
+
+/* ============================================== 7. unsaved work
+
+   The banner from ppm-unsaved.js. Amber rather than red on purpose: nothing is lost, the work
+   is on this computer and will be retried, so this is a caution and not a failure. It turns
+   green only when it has drained, and then removes itself.
+*/
+
+.ppm-unsaved {
+  margin: 0 0 14px;
+  border: 1px solid #fcd34d;
+  border-left: 5px solid #d97706;
+  border-radius: 8px;
+  background-color: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ppm-unsaved.settled {
+  border-color: #86efac;
+  border-left-color: #16a34a;
+  background-color: #f0fdf4;
+  color: #166534;
+}
+
+.ppm-unsaved-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+}
+
+.ppm-unsaved-text {
+  margin-right: auto;
+  font-weight: 700;
+}
+
+.ppm-unsaved-action {
+  padding: 4px 11px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background-color: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ppm-unsaved-action:hover:not(:disabled) {
+  background-color: rgba(146, 64, 14, 0.08);
+}
+
+.ppm-unsaved-action:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.ppm-unsaved-list {
+  margin: 0;
+  padding: 0 14px 12px 32px;
+  font-size: 11px;
+}
+
+.ppm-unsaved-list li {
+  margin-bottom: 4px;
+  overflow-wrap: anywhere;
+}

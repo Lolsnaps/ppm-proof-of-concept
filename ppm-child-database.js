@@ -2811,10 +2811,34 @@
       );
     }
 
+    const prior = base.get(found.key) || null;
+
+    /*
+      Nothing to do if the record is byte-for-byte what the database already holds.
+
+      diffStore() has always skipped unchanged records; saveOne() did not, and the harness
+      caught it - re-saving an untouched task issued an UPDATE. That is not merely wasteful: it
+      bumps the row version, so somebody else editing the same record gets a conflict caused by
+      a save that changed nothing, and it writes an audit row describing no change at all.
+
+      The comparison is on the canonical payload, not the object, so a record whose keys arrive
+      in a different order still counts as unchanged.
+    */
+    if (prior && !prior.deleted && prior.payload === found.payload) {
+      return {
+        module: moduleName,
+        key: found.key,
+        operation: "unchanged",
+        status: "saved",
+        at: new Date().toISOString(),
+        message: "No change; the database already holds this record."
+      };
+    }
+
     return saveChildRecord(moduleName, {
       key: found.key,
       item: found.item,
-      prior: base.get(found.key) || null,
+      prior,
       payload: found.payload
     });
   }
@@ -3018,51 +3042,22 @@
     );
   }
 
-  function installWriteThrough() {
-    if (writeThroughInstalled) return;
-    writeThroughInstalled = true;
-    const previousSetItem = Storage.prototype.setItem;
-    const byKey = Object.fromEntries(
-      [...DATABASE_MODULES].map((name) => [moduleDefinition(name).localKey, name])
-    );
+  /* ============================================ Stage 16: the write-through is gone
 
-    Storage.prototype.setItem = function (key, value) {
-      const result = previousSetItem.call(this, key, value);
-      if (this !== window.localStorage) return result;
-      const moduleName = byKey[String(key)];
-      if (!moduleName) return result;
-      syncFromRawValue(moduleName, value);
-      return result;
-    };
+     installWriteThrough() replaced Storage.prototype.setItem for the whole page, and separately
+     wrapped PPMAuth.writeGlobal because the first patch could not see writes that deliberately
+     bypassed it. Between them they turned ordinary browser storage writes into database writes -
+     invisibly, and without any way for the caller to learn the result.
 
-    /* ------------------------------------------- Stage 12: the second seam
+     Stage 12's bug is the argument against it: the child adapter hooked only the prototype, so
+     every configuration store written through writeGlobal saved locally and never reached
+     PostgreSQL, with no error anywhere. A design needing two interceptions to stay in step will
+     eventually have one of them missing.
 
-       Patching Storage.prototype.setItem is not enough for the administration
-       configuration stores. ppm-admin-utils.js writes them through
-       PPMAuth.writeGlobal(), which exists precisely to bypass the patched
-       localStorage — it calls the original setItem captured before patching. So
-       lifecycle templates, reference data, mandatory rules, RAG config, calendars
-       and periods would have been saved locally and silently never reached
-       PostgreSQL.
+     ppm-data.js replaced all of it. See the matching note in ppm-database.js.
+  */
 
-       Note ppmRagConfig is written from BOTH paths: ppm-admin-utils.js uses
-       writeGlobal, ppm-planning-utils.js uses plain setItem. It needs both seams,
-       which is exactly the kind of two-writer split the handover warns about.
 
-       Hydration deliberately keeps using PPMAuth.rawSet, which is left unpatched,
-       so loading from the database cannot recurse back into a write.
-    --------------------------------------------------------------------------- */
-    const auth = window.PPMAuth;
-    if (!auth || typeof auth.writeGlobal !== "function") return;
-    const previousWriteGlobal = auth.writeGlobal;
-
-    auth.writeGlobal = function (key, value, reason) {
-      const result = previousWriteGlobal.call(this, key, value, reason);
-      const moduleName = byKey[String(key)];
-      if (moduleName) syncFromRawValue(moduleName, JSON.stringify(value));
-      return result;
-    };
-  }
 
 
   function baselineRecord(moduleName, record) {
@@ -3613,7 +3608,6 @@
 
   async function boot() {
     if (!activeModules().length) return { hydrated: [], skipped: [], failed: [] };
-    installWriteThrough();
     return hydrate().catch((error) => {
       console.error("PPMChildDatabase: hydration failed; the page is using the last local child data.", error);
       return { hydrated: [], skipped: [], failed: [{ module: "all", error: String(error) }] };
