@@ -53,9 +53,31 @@
     return parseJson(localStorage.getItem(key), fallback);
   }
 
-  function write(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-    return value;
+  /*
+    Stage 16: the one write seam.
+
+    Was localStorage.setItem, which reached PostgreSQL only because both adapters had replaced
+    Storage.prototype.setItem, and which returned before the database had been asked anything.
+
+    The collection is looked up from the key rather than mapped by hand, so the eight stores
+    below need no list here that could go stale.
+  */
+  async function write(key, value) {
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so nothing was saved.",
+        queued: false,
+        value
+      };
+    }
+    const collection = window.PPMStore.collectionFor(key);
+    if (!collection) {
+      return { ok: false, reason: "invalid", message: `No collection is registered for "${key}".`, queued: false, value };
+    }
+    const result = await window.PPMStore.replaceAll(collection, value);
+    return { ...result, value };
   }
 
   function uid(prefix) {
@@ -439,10 +461,11 @@
   }
 
   function databaseBaselineWorkflowEnabled() {
-    return Boolean(window.PPMChildDatabase?.stage11BReady?.());
+    /* Stage 17: was stage11BReady(), retired in Stage 14 and silently false ever since. */
+    return Boolean(window.PPMChildDatabase?.workflowReady?.("baseline"));
   }
 
-  function createApprovedBaseline(projectCode, tasks, approval) {
+  async function createApprovedBaseline(projectCode, tasks, approval) {
     if (databaseBaselineWorkflowEnabled())
       throw new Error("Approved baselines must be created through the Stage 11B database workflow.");
     const store = getBaselines();
@@ -463,8 +486,13 @@
     };
     versions.push(record);
     store[projectCode] = versions;
-    write(KEYS.baselines, store);
-    return record;
+    /*
+      Stage 16: the write result comes back with the record. Awaiting a write and then returning
+      the record regardless would be the original defect wearing an await - the caller would
+      still be told a baseline exists that the database may have refused.
+    */
+    const result = await write(KEYS.baselines, store);
+    return { ...result, record };
   }
 
   function getBaselineRequests() {
@@ -472,7 +500,7 @@
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
   }
 
-  function saveBaselineRequest(projectCode, request) {
+  async function saveBaselineRequest(projectCode, request) {
     if (databaseBaselineWorkflowEnabled())
       throw new Error("Rebaseline requests must be submitted through the Stage 11B database workflow.");
     const store = getBaselineRequests();
@@ -486,11 +514,12 @@
     };
     rows.push(record);
     store[projectCode] = rows;
-    write(KEYS.baselineRequests, store);
-    return record;
+    /* Same contract as createApprovedBaseline: the result, with the record attached. */
+    const result = await write(KEYS.baselineRequests, store);
+    return { ...result, record };
   }
 
-  function decideBaselineRequest(projectCode, requestId, decision) {
+  async function decideBaselineRequest(projectCode, requestId, decision) {
     if (databaseBaselineWorkflowEnabled())
       throw new Error("Rebaseline decisions must be recorded through the Stage 11B database workflow.");
     const store = getBaselineRequests();
@@ -507,8 +536,8 @@
       decidedAt: new Date().toISOString()
     });
     store[projectCode] = rows;
-    write(KEYS.baselineRequests, store);
-    return request;
+    const result = await write(KEYS.baselineRequests, store);
+    return { ...result, record: request };
   }
 
   function baselineTaskRecord(projectCode, taskId) {
@@ -539,7 +568,7 @@
     return { ...DEFAULT_RAG_CONFIG, ...(read(KEYS.ragConfig, {}) || {}) };
   }
 
-  function saveRagConfig(config) {
+  async function saveRagConfig(config) {
     return write(KEYS.ragConfig, { ...getRagConfig(), ...config, updatedAt: new Date().toISOString() });
   }
 
@@ -571,7 +600,7 @@
     };
   }
 
-  function saveResourceConfig(config) {
+  async function saveResourceConfig(config) {
     return write(KEYS.resourceConfig, {
       ...getResourceConfig(),
       ...config,
@@ -593,21 +622,21 @@
     return Array.isArray(rows) ? rows : [];
   }
 
-  function saveDemand(rows) {
+  async function saveDemand(rows) {
     return write(KEYS.demand, Array.isArray(rows) ? rows : []);
   }
   function getAbsences() {
     const rows = read(KEYS.absence, []);
     return Array.isArray(rows) ? rows : [];
   }
-  function saveAbsences(rows) {
+  async function saveAbsences(rows) {
     return write(KEYS.absence, Array.isArray(rows) ? rows : []);
   }
   function getScenarios() {
     const rows = read(KEYS.scenarios, []);
     return Array.isArray(rows) ? rows : [];
   }
-  function saveScenarios(rows) {
+  async function saveScenarios(rows) {
     return write(KEYS.scenarios, Array.isArray(rows) ? rows : []);
   }
 
@@ -735,7 +764,7 @@
     projects' history, and the merge on save preserves the projects they cannot
     see. Keep it that way; a raw global write here would discard hidden history.
   */
-  function recordRagHistory(projectCode, calculated, reported, justifications, recordedBy) {
+  async function recordRagHistory(projectCode, calculated, reported, justifications, recordedBy) {
     const store = read(KEYS.ragHistory, {});
     const rows = Array.isArray(store[projectCode]) ? store[projectCode] : [];
     const dimensions = {};
@@ -756,8 +785,17 @@
     };
     rows.push(entry);
     store[projectCode] = rows;
-    write(KEYS.ragHistory, store);
-    return entry;
+
+    /*
+      Appended, not replaced. rag_history is append-only - there is no UPDATE or DELETE grant,
+      enforced three ways in the database - so rewriting the whole collection would try to
+      re-save every earlier snapshot and be refused. One row, keyed by its project.
+    */
+    if (!window.PPMStore) {
+      return { ok: false, reason: "failed", message: "The data layer is not loaded on this page.", queued: false, entry };
+    }
+    const result = await window.PPMStore.ragHistory.save(entry, { storageGroup: projectCode });
+    return { ...result, entry };
   }
 
   function getRagHistory(projectCode) {

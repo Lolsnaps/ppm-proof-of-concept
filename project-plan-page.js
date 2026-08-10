@@ -564,7 +564,7 @@ function validatePlan() {
   }
   return true;
 }
-function syncLinkedDemandDates() {
+async function syncLinkedDemandDates() {
   const demands = PPMPlanning.getDemand();
   let changed = false;
   demands.forEach((demand) => {
@@ -597,10 +597,13 @@ function syncLinkedDemandDates() {
       changed = true;
     }
   });
-  if (changed) PPMPlanning.saveDemand(demands);
-  return changed;
+  if (!changed) return { changed: false, ok: true };
+  /* Stage 16: the caller needs to know both whether dates moved and whether that reached the
+     database, so both come back rather than a bare boolean. */
+  const demandResult = await PPMPlanning.saveDemand(demands);
+  return { changed: true, ok: demandResult ? demandResult.ok !== false : true, message: demandResult?.message };
 }
-function savePlan() {
+async function savePlan() {
   if (projectArchived || !dirty) return;
   if (!validatePlan()) return;
   const now = new Date().toISOString();
@@ -609,7 +612,11 @@ function savePlan() {
     task.createdAt = task.createdAt || now;
   });
   savePlans();
-  const demandDatesChanged = syncLinkedDemandDates();
+  const demandSync = await syncLinkedDemandDates();
+  const demandDatesChanged = demandSync.changed;
+  if (!demandSync.ok) {
+    showMessage(`The plan was saved, but linked resource demand dates were not: ${demandSync.message}`, "error");
+  }
   /* Stage 14: browser-side audit emission removed. public.audit_log records every
      task change against the signed-in person, verifiably. */
   originalTasks = new Map(tasks.map((task) => [task.taskId, JSON.parse(JSON.stringify(task))]));
@@ -809,11 +816,27 @@ async function submitBaselineDecision(event) {
       decisionNotes: document.getElementById("baselineDecisionReason").value.trim(),
       status: action === "rejectRequest" ? "Rejected" : "Approved"
     },
-    databaseWorkflow = Boolean(window.PPMChildDatabase?.stage11BReady?.()),
+    databaseWorkflow = Boolean(window.PPMChildDatabase?.workflowReady?.("baseline")),
     submitButton = document.getElementById("submitBaselineDecision"),
     originalLabel = submitButton.textContent;
 
   let entityId = "";
+
+  /*
+    Stage 17: no fallback. The else-branch below wrote rows the database refuses through its
+    workflow guard trigger, and the refusal was swallowed by the write seam - so the screen
+    showed a decision that never happened. If the workflow is unavailable the honest answer is
+    to say so.
+  */
+  if (!databaseWorkflow) {
+    showMessage(
+      "The approval workflow is unavailable, so this cannot be recorded. Reload the page; if it " +
+        "persists, the database connection or your sign-in has been lost.",
+      "error"
+    );
+    return;
+  }
+
   submitButton.disabled = true;
   submitButton.textContent = "Saving…";
   try {
@@ -841,11 +864,15 @@ async function submitBaselineDecision(event) {
         });
         entityId = `BASELINE-v${result?.baselineVersion || currentBaseline()?.version || 1}`;
       } else {
-        const baseline = PPMPlanning.createApprovedBaseline(projectCode, tasks, {
+        const baseline = await PPMPlanning.createApprovedBaseline(projectCode, tasks, {
           ...decision,
           reason: decision.decisionNotes
         });
-        entityId = `BASELINE-v${baseline.version}`;
+        if (baseline && baseline.ok === false) {
+          showMessage(baseline.message, "error");
+          return;
+        }
+        entityId = `BASELINE-v${baseline.record.version}`;
         savePlans();
       }
     } else {
@@ -877,13 +904,21 @@ async function submitBaselineDecision(event) {
             }
           });
           savePlans();
-          PPMPlanning.createApprovedBaseline(projectCode, tasks, {
+          const approved = await PPMPlanning.createApprovedBaseline(projectCode, tasks, {
             ...decision,
             reason: request.reason,
             impact: request.impact
           });
+          if (approved && approved.ok === false) {
+            showMessage(approved.message, "error");
+            return;
+          }
         }
-        PPMPlanning.decideBaselineRequest(projectCode, requestId, decision);
+        const decided = await PPMPlanning.decideBaselineRequest(projectCode, requestId, decision);
+        if (decided && decided.ok === false) {
+          showMessage(decided.message, "error");
+          return;
+        }
       }
     }
 
@@ -966,10 +1001,25 @@ async function submitRebaseline(event) {
 
   const reason = document.getElementById("rebaselineReason").value.trim(),
     impact = document.getElementById("rebaselineImpact").value.trim(),
-    databaseWorkflow = Boolean(window.PPMChildDatabase?.stage11BReady?.()),
+    databaseWorkflow = Boolean(window.PPMChildDatabase?.workflowReady?.("baseline")),
     submitButton = form.querySelector('[type="submit"]'),
     originalLabel = submitButton?.textContent || "Submit request";
   let request;
+
+  /*
+    Stage 17: no fallback. The else-branch below wrote rows the database refuses through its
+    workflow guard trigger, and the refusal was swallowed by the write seam - so the screen
+    showed a decision that never happened. If the workflow is unavailable the honest answer is
+    to say so.
+  */
+  if (!databaseWorkflow) {
+    showMessage(
+      "The approval workflow is unavailable, so this cannot be recorded. Reload the page; if it " +
+        "persists, the database connection or your sign-in has been lost.",
+      "error"
+    );
+    return;
+  }
 
   if (submitButton) {
     submitButton.disabled = true;
@@ -996,7 +1046,7 @@ async function submitRebaseline(event) {
       });
       if (result?.requestId) request.requestId = result.requestId;
     } else {
-      request = PPMPlanning.saveBaselineRequest(projectCode, {
+      const requested = await PPMPlanning.saveBaselineRequest(projectCode, {
         existingBaseline: currentBaseline(),
         proposedBaseline: proposed,
         reason,
@@ -1004,8 +1054,12 @@ async function submitRebaseline(event) {
         requestedBy: person.name,
         requestedByResourceId: person.resourceId
       });
+      if (requested && requested.ok === false) {
+        showMessage(requested.message, "error");
+        return;
+      }
+      request = requested.record;
     }
-
 
     closeModal("rebaselineModal");
     renderBaselineGovernance();
@@ -1097,7 +1151,7 @@ function askDelete(taskId) {
     `Delete ${task.taskName || "this plan item"}? ${childCount} child item(s), ${linked} dependency link(s) and ${demands} resource demand record(s) are linked. Child items will move to the deleted item's parent; linked resource demand will be cancelled.`;
   document.getElementById("deleteConfirmation").classList.add("visible");
 }
-function confirmDelete() {
+async function confirmDelete() {
   const task = tasks.find((t) => t.taskId === pendingDeleteId);
   if (!task) return closeDelete();
   tasks
@@ -1115,7 +1169,11 @@ function confirmDelete() {
       d.status = "Cancelled";
       d.notes = [d.notes, "Cancelled because the linked plan item was removed."].filter(Boolean).join("\n");
     });
-  PPMPlanning.saveDemand(demands);
+  const demandResult = await PPMPlanning.saveDemand(demands);
+  if (demandResult && demandResult.ok === false) {
+    showMessage(`The linked resource demand could not be cancelled: ${demandResult.message}`, "error");
+    return;
+  }
   tasks = tasks.filter((t) => t.taskId !== task.taskId);
   markDirty(task.taskId);
   closeDelete();

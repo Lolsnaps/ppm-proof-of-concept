@@ -869,7 +869,7 @@ function startEditing(formName) {
   PostgreSQL. The audit trail is written by database triggers from the authenticated
   identity, so there is nothing to record from here.
 */
-function saveEditor() {
+async function saveEditor() {
   if (!openEditorForm || !project) return;
   const formName = openEditorForm;
   const host = editorHost();
@@ -911,7 +911,7 @@ function saveEditor() {
     because that is the only one that reports health.
   */
   if (formName === "status" && window.PPMPlanning?.recordRagHistory) {
-    PPMPlanning.recordRagHistory(
+    const recorded = await PPMPlanning.recordRagHistory(
       updated.projectCode,
       updated.calculatedRags || {},
       Object.fromEntries(
@@ -920,6 +920,20 @@ function saveEditor() {
       updated.ragOverrideJustifications || {},
       updated.projectManager || updated.projectManagerEmail || "Project team"
     );
+    /*
+      Stage 16: the snapshot is part of the status update, so a refused one is reported rather
+      than lost. The project itself has already saved at this point - saying so plainly is
+      better than a message that implies neither happened.
+    */
+    if (recorded && recorded.ok === false) {
+      closeEditor();
+      loadProject();
+      showMessage(
+        `The status was saved, but the RAG history entry was not recorded: ${recorded.message}`,
+        "error"
+      );
+      return;
+    }
   }
 
   closeEditor();

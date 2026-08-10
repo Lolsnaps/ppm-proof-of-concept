@@ -56,9 +56,6 @@ const PROGRAMME_RAID_FIELDS = [
   { key: "response", label: "Response" },
   { key: "owner", label: "Owner" }
 ];
-function saveStore(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
 const escapeHtml = PPMCore.escapeHtml;
 function formatDate(value) {
   if (!value) return "Not set";
@@ -295,7 +292,8 @@ function openProgramme(programmeId) {
 function closeProgramme() {
   document.getElementById("programmeModal").classList.remove("visible");
 }
-function saveProgramme(event) {
+/* A submit handler, so the async chain that starts at the save stops here. */
+async function saveProgramme(event) {
   event.preventDefault();
   const sponsor = person("programmeSponsor"),
     lead = person("programmeLead"),
@@ -338,7 +336,18 @@ function saveProgramme(event) {
   const index = programmes.findIndex((item) => item.programmeId === record.programmeId);
   if (index >= 0) programmes[index] = record;
   else programmes.push(record);
-  programmes = PPMGovernance.saveProgrammes(programmes);
+  /*
+    Stage 16: awaited, and nothing below runs unless the database accepted it. The audit entry
+    and the project updates that follow both describe a change that has been made - writing
+    them after a refused save would record something that did not happen.
+  */
+  const programmeResult = await PPMGovernance.saveProgrammes(programmes);
+  if (!programmeResult.ok) {
+    setMessage(programmeResult.message, "error");
+    return;
+  }
+  programmes = programmeResult.programmes;
+
   PPMChangeLog.recordRow({
     before: old,
     after: record,
@@ -362,7 +371,18 @@ function saveProgramme(event) {
       projectsChanged = true;
     }
   });
-  if (projectsChanged) saveStore("ppmProjects", projects);
+  if (projectsChanged) {
+    const projectResult = await PPMStore.projects.replaceAll(projects);
+    if (!projectResult.ok) {
+      setMessage(
+        `${record.name} was saved, but the projects that reference it were not updated: ${projectResult.message}`,
+        "error"
+      );
+      renderProgrammes();
+      return;
+    }
+  }
+
   closeProgramme();
   renderProgrammes();
   setMessage(`${record.name} was saved.`, "success");
@@ -424,7 +444,8 @@ function openRecord(kind, programmeId, id = "") {
 function closeRecord() {
   document.getElementById("recordModal").classList.remove("visible");
 }
-function saveRecord(event) {
+/* Submit handler: the async chain ends here. */
+async function saveRecord(event) {
   event.preventDefault();
   const kind = document.getElementById("recordKind").value,
     programmeId = document.getElementById("recordProgrammeId").value,
@@ -479,7 +500,25 @@ function saveRecord(event) {
   if (index >= 0) records[index] = record;
   else records.push(record);
   store[programmeId] = records;
-  saveStore(kind === "milestone" ? MILESTONE_KEY : RAID_KEY, store);
+
+  /*
+    Stage 16: one record, not the whole store.
+
+    These collections are keyed by programme, so the storage group has to be stated - the
+    adapter derives it from a project or programme CODE, and these records carry a programmeId.
+    Passing the group explicitly is also why this is a single save rather than replaceAll:
+    replaceAll diffs the entire collection, so handing it one programme's records would read
+    every other programme's as deleted.
+  */
+  const recordResult = await PPMStore[kind === "milestone" ? "programmeMilestones" : "programmeRaid"].save(
+    record,
+    { storageGroup: programmeId }
+  );
+  if (!recordResult.ok) {
+    setMessage(recordResult.message, "error");
+    return;
+  }
+
   PPMChangeLog.recordRow({
     before: id ? findRecord(kind, programmeId, id) : null,
     after: record,
@@ -510,9 +549,17 @@ function removeRecord(kind, programmeId, id) {
   askConfirmation(
     `Remove programme ${kind}?`,
     `Remove “${record.title || "this record"}”? This only removes the selected programme-level record.`,
-    () => {
+    async () => {
+      const removal = await PPMStore[kind === "milestone" ? "programmeMilestones" : "programmeRaid"].remove(
+        record,
+        { storageGroup: programmeId }
+      );
+      if (!removal.ok) {
+        setMessage(removal.message, "error");
+        return;
+      }
       store[programmeId] = (store[programmeId] || []).filter((item) => item.recordId !== id);
-      saveStore(kind === "milestone" ? MILESTONE_KEY : RAID_KEY, store);
+
       PPMChangeLog.recordDeletion({
         before: record,
         entityType: kind === "milestone" ? "Programme milestone" : "Programme RAID",
@@ -571,7 +618,12 @@ document.getElementById("confirmAction").addEventListener("click", () => {
 );
 document
   .getElementById("programmeForm")
-  .addEventListener("submit", () => PPMAdmin.reconcileProgrammeMembership());
+  .addEventListener("submit", async () => {
+    /* Awaited so a failure to reconcile membership is visible rather than a rejected promise
+       nobody is listening to. */
+    const reconciled = await PPMAdmin.reconcileProgrammeMembership();
+    if (reconciled && reconciled.ok === false) setMessage(reconciled.message, "error");
+  });
 const programmeParameters = new URLSearchParams(window.location.search),
   requestedProgramme = programmeParameters.get("programme"),
   requestedProgrammeItem = programmeParameters.get("item") || "";

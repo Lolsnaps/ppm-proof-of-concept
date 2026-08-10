@@ -14,8 +14,28 @@
       : [];
   }
 
-  function saveResources(resources) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(resources));
+  /*
+    Stage 16: the one write seam.
+
+    Was localStorage.setItem(STORAGE_KEY, ...), which reached PostgreSQL only because both
+    adapters had replaced Storage.prototype.setItem, and which returned before the database
+    had been asked anything - so a caller could report success for a write the database went
+    on to refuse.
+
+    replaceAll keeps the collection-shaped call every caller already makes, and writes only
+    the records that actually changed, one row at a time, each carrying its own version.
+    Callers must look at what comes back.
+  */
+  async function saveResources(resources) {
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so nothing was saved.",
+        queued: false
+      };
+    }
+    return window.PPMStore.people.replaceAll(resources);
   }
 
   function nextResourceId(resources) {
@@ -171,7 +191,9 @@
     );
   }
 
-  function saveQuickAddPerson(event) {
+  /* A submit handler, so the async chain that starts at the save ends here rather than
+     rippling any further. */
+  async function saveQuickAddPerson(event) {
     event.preventDefault();
     if (!quickAddState) return;
 
@@ -228,7 +250,21 @@
     };
 
     resources.push(resource);
-    saveResources(resources);
+
+    /*
+      Awaited, and the person is only selected if it actually saved. Previously this pushed,
+      wrote to localStorage and selected the new person regardless - so a refused write left
+      somebody selected in a picklist who did not exist in the database, and the next page to
+      load simply would not have them.
+    */
+    const result = await saveResources(resources);
+    if (!result.ok) {
+      const message = document.getElementById("ppmQuickPersonMessage");
+      if (message) message.textContent = result.message;
+      else console.error("PPMResources: the new person was not saved.", result.message);
+      return;
+    }
+
     selectQuickAddPerson(resource, false);
   }
 
@@ -363,7 +399,29 @@
     return people;
   }
 
-  function ensureLegacyResources() {
+  /*
+    Stage 16: the read and the write are separated.
+
+    This used to be one function that read the resources, derived any people who exist only in
+    a legacy name field, and persisted them if anything had changed. Eleven call sites across
+    ten files use the return value, one of them at the top of a page script where there is no
+    function to make asynchronous - so a getter that also writes could not survive writes
+    becoming awaited. It should not have been a getter that writes in any case.
+
+    So deriveLegacyResources() computes and returns; backfillLegacyResources() is the only
+    thing that saves. ensureLegacyResources() keeps its old name and its old synchronous
+    contract, and all eleven callers are unaffected.
+
+    IDENTIFIERS ARE STILL STABLE
+
+    A derived person is given the next free RES-nnnn, so it matters that two pages deriving the
+    same list agree. They do: the derivation is a pure function of the resources and the legacy
+    people, and both pages read the same hydrated data. Persisting it early still matters, which
+    is why the resource directory backfills on load - that freezes the identifiers rather than
+    leaving them recomputed. That was previously a side effect of whichever page happened to
+    call the getter first.
+  */
+  function deriveLegacyResources() {
     const resources = getResources();
     let changed = false;
 
@@ -414,8 +472,21 @@
       changed = true;
     });
 
-    if (changed) saveResources(resources);
-    return resources;
+    return { resources, changed };
+  }
+
+  /* The old name and the old contract: synchronous, returns the resources. It no longer
+     writes, which is the only thing that changed for its eleven callers. */
+  function ensureLegacyResources() {
+    return deriveLegacyResources().resources;
+  }
+
+  /* The write half. Call it once where it matters - the resource directory does, on load -
+     and look at what it returns, because unlike the old side effect this one can fail. */
+  async function backfillLegacyResources() {
+    const { resources, changed } = deriveLegacyResources();
+    if (!changed) return { ok: true, saved: 0, unchanged: resources.length, nothingToDo: true };
+    return saveResources(resources);
   }
 
   function resolveDisplayName(resourceId, fallbackName) {
@@ -433,6 +504,7 @@
     populatePersonSelect,
     getSelectedPerson,
     ensureLegacyResources,
+    backfillLegacyResources,
     resolveDisplayName
   };
 })();

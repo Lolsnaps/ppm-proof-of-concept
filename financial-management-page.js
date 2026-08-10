@@ -444,7 +444,7 @@ async function submitApproval(event) {
     requester = { resourceId: signedIn.resourceId, name: signedIn.fullName, email: signedIn.email },
     approver = PPMResources.getSelectedPerson(el("approvalApprover")),
     reason = el("approvalReason").value,
-    databaseWorkflow = Boolean(window.PPMChildDatabase?.stage11CReady?.()),
+    databaseWorkflow = Boolean(window.PPMChildDatabase?.workflowReady?.("financial")),
     submitButton = event.currentTarget.querySelector('[type="submit"]'),
     originalLabel = submitButton?.textContent || "Submit for approval";
   if (!approver.resourceId) {
@@ -460,6 +460,30 @@ async function submitApproval(event) {
     submitButton.textContent = "Saving…";
   }
   try {
+    /*
+      Stage 17: no fallback. The else-branch wrote rows the database refuses through
+      private.guard_financial_approval_workflow_write, and the refusal was swallowed.
+    */
+    if (!databaseWorkflow) {
+      showMessage(
+        "The budget approval workflow is unavailable, so this cannot be recorded. Reload the " +
+          "page; if it persists, the database connection or your sign-in has been lost.",
+        "error"
+      );
+      return;
+    }
+    /*
+      Stage 17: no fallback. The else-branch wrote rows the database refuses through
+      private.guard_financial_approval_workflow_write, and the refusal was swallowed.
+    */
+    if (!databaseWorkflow) {
+      showMessage(
+        "The budget approval workflow is unavailable, so this cannot be recorded. Reload the " +
+          "page; if it persists, the database connection or your sign-in has been lost.",
+        "error"
+      );
+      return;
+    }
     if (databaseWorkflow) {
       const result = await PPMChildDatabase.commitFinancialWorkflow({
         operation: "request",
@@ -528,7 +552,7 @@ function openDecision(id) {
 async function decide(status) {
   const signedIn = PPMAuth.getCurrentUser(),
     approval = PPMFinancial.getApprovals(projectCode()).find((item) => item.approvalId === activeDecisionId),
-    databaseWorkflow = Boolean(window.PPMChildDatabase?.stage11CReady?.()),
+    databaseWorkflow = Boolean(window.PPMChildDatabase?.workflowReady?.("financial")),
     comments = el("decisionComments").value,
     approveButton = el("decisionForm").querySelector('[type="submit"]'),
     rejectButton = el("rejectButton");

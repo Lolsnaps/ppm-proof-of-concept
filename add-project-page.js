@@ -242,7 +242,7 @@ function closeRagConfig() {
   document.body.style.overflow = "";
 }
 
-function saveRagConfigForm(event) {
+async function saveRagConfigForm(event) {
   event.preventDefault();
   const config = Object.fromEntries(
     Object.keys(PPMPlanning.DEFAULT_RAG_CONFIG).map((key) => [key, Number(readFieldValue(key))])
@@ -255,7 +255,11 @@ function saveRagConfigForm(event) {
     showMessage("Each red threshold must be higher than its corresponding amber threshold.", "error");
     return;
   }
-  PPMPlanning.saveRagConfig(config);
+  const ragResult = await PPMPlanning.saveRagConfig(config);
+  if (ragResult && ragResult.ok === false) {
+    showMessage(ragResult.message, "error");
+    return;
+  }
   closeRagConfig();
   updateCalculatedRags();
   showMessage("RAG calculation thresholds were updated.", "success");
@@ -1414,7 +1418,7 @@ function loadProjectForEditing() {
   }
 }
 
-function saveProject(event) {
+async function saveProject(event) {
   event.preventDefault();
 
   clearMessage();
@@ -1554,13 +1558,18 @@ function saveProject(event) {
   }
 
   if (savedProject && (!isEditMode || isStatusUpdateMode)) {
-    PPMPlanning.recordRagHistory(
+    const recorded = await PPMPlanning.recordRagHistory(
       savedProject.projectCode,
       savedProject.calculatedRags || currentCalculatedRags,
       reportedRagsFromForm(),
       ragJustificationsFromForm(),
       savedProject.projectManager || savedProject.projectManagerEmail || "Project team"
     );
+    /* Stage 16: the project is already saved by this point, so a refused snapshot is reported
+       as exactly that rather than implying the whole save failed. */
+    if (recorded && recorded.ok === false) {
+      showMessage(`The project was saved, but its RAG history entry was not recorded: ${recorded.message}`, "error");
+    }
   }
 
   if (savedProject) {

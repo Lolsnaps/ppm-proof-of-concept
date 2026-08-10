@@ -2700,6 +2700,157 @@
      because an attempt to rewrite reported status is worth someone seeing. It
      clears itself on the next hydration once local and database agree again.
   --------------------------------------------------------------------------- */
+  /* ==================================================== Stage 16: row-level writes
+
+     saveOne() and removeOne() are the primitives ppm-data.js is built on, and the reason
+     Stage 16 can delete the write-through patches at all.
+
+     Everything below this comment already existed; what was missing was a way to say "save
+     this one record" without going through localStorage. Without it the only route to the
+     database was to rewrite an entire collection and let diffStore work out what changed -
+     which is why the application rewrites every project to edit one, and why two people
+     editing different projects overwrite each other.
+
+     WHY THESE BUILD A ONE-RECORD STORE RATHER THAN CONSTRUCTING THE ITEM DIRECTLY
+
+     The flattened item shape - record, storageGroup, projectCode, programmeCode, scopeKey,
+     recordKey - is derived differently for each of the three store shapes, and those rules
+     live in flattenStore(). Duplicating them here would create two definitions of what a
+     record's identity is, and they would drift the first time a collection changed shape.
+     So a single record is wrapped in the smallest valid store for its shape and put through
+     the same function a full sync uses. One definition, exercised by both paths.
+
+     The result is the same structure saveChildRecord() already returns - status of saved,
+     conflict, refused or failed, with a message written for a person - so callers of the
+     row-level API and readers of a sync outcome see one vocabulary.
+  */
+
+  function singleRecordStore(definition, record, storageGroup) {
+    if (definition.shape === "singleton") return record;
+    if (definition.shape === "array") return [record];
+    return { [storageGroup]: [record] };
+  }
+
+  function storageGroupFor(definition, record, options) {
+    const explicit = options?.storageGroup ?? options?.projectCode ?? options?.programmeCode;
+    if (explicit !== undefined && explicit !== null && String(explicit).trim()) return String(explicit).trim();
+    /* Fall back to the record's own project field, which is where the group comes from for
+       every project-scoped collection. A programme-scoped record carries programmeCode. */
+    const fromRecord =
+      (definition.projectField && record?.[definition.projectField]) ||
+      record?.projectCode ||
+      record?.programmeCode ||
+      "";
+    return String(fromRecord).trim();
+  }
+
+  /* Locates a record the way a save would, so a caller can be told what the database
+     currently holds without having to know about baselines or composite keys. */
+  function identify(moduleName, record, options) {
+    const definition = moduleDefinition(moduleName);
+    const group = storageGroupFor(definition, record, options);
+    const items = flattenStore(moduleName, singleRecordStore(definition, record, group));
+    if (!items.length) return null;
+    const item = items[0];
+
+    /*
+      flattenStore does not require a record key - a full sync tolerates a malformed row by
+      producing an item with an empty one. That is survivable when diffing a whole store and
+      fatal for a single save: the first test written against saveOne inserted a row keyed
+      "PRJ-001|", a phantom record with no identity that nothing could ever find or update
+      again. baselineRecord() has always guarded this; the row-level path must too.
+    */
+    if (definition.shape !== "singleton" && !String(item.recordKey || "").trim()) return null;
+
+    return { definition, item, key: compositeKey(item), payload: baselinePayload(item) };
+  }
+
+  /*
+    Read-only collections are deliberately absent from DATABASE_MODULES, so an existence check
+    against that set alone reports legacyAudit as "not a database-backed collection" - which
+    is both wrong and unhelpful, since it exists and is simply not writable from here. Known
+    but unwritable and genuinely unknown are different answers and get different messages.
+  */
+  function writableModule(moduleName) {
+    if (!MODULES[moduleName]) return { ok: false, status: "failed", message: `"${moduleName}" is not a collection in this application.` };
+    /* READ_ONLY_MODULES is a frozen array, not a Set - the two collection types are mixed in
+       this file and .has() on the wrong one throws rather than returning false. */
+    if (MODULES[moduleName].readOnly || READ_ONLY_MODULES.includes(moduleName))
+      return { ok: false, status: "refused", message: `${moduleName} is read-only in this application.` };
+    if (!DATABASE_MODULES.has(moduleName))
+      return { ok: false, status: "failed", message: `"${moduleName}" is not a database-backed collection.` };
+    return { ok: true };
+  }
+
+  function rowFailure(moduleName, key, status, message) {
+    return { module: moduleName, key, operation: "save", status, at: new Date().toISOString(), message };
+  }
+
+  async function saveOne(moduleName, record, options) {
+    const writable = writableModule(moduleName);
+    if (!writable.ok) return rowFailure(moduleName, "(unwritable)", writable.status, writable.message);
+
+    const found = identify(moduleName, record, options);
+    if (!found)
+      return rowFailure(
+        moduleName,
+        "(unidentified)",
+        "invalid",
+        `The record has no ${moduleDefinition(moduleName).idField || "identifier"}, so there is nothing to save it as.`
+      );
+
+    let base;
+    try {
+      base = await ensureBaseline(moduleName);
+    } catch (error) {
+      return rowFailure(
+        moduleName,
+        found.key,
+        "failed",
+        `Could not load the database baseline: ${error?.message || error}`
+      );
+    }
+
+    return saveChildRecord(moduleName, {
+      key: found.key,
+      item: found.item,
+      prior: base.get(found.key) || null,
+      payload: found.payload
+    });
+  }
+
+  async function removeOne(moduleName, record, options) {
+    const writable = writableModule(moduleName);
+    if (!writable.ok) return rowFailure(moduleName, "(unwritable)", writable.status, writable.message);
+
+    const found = identify(moduleName, record, options);
+    if (!found) return rowFailure(moduleName, "(unidentified)", "invalid", "The record has no identifier.");
+
+    /* Recorded history is not deletable, and saying so here gives a reason rather than the
+       bare permission error the database would return. The database refuses it regardless -
+       there is no DELETE grant - so this is a message, not a control. */
+    if (found.definition.appendOnly)
+      return rowFailure(
+        moduleName,
+        found.key,
+        "refused",
+        `${moduleName} is append-only recorded history; ${found.key} cannot be removed.`
+      );
+
+    let base;
+    try {
+      base = await ensureBaseline(moduleName);
+    } catch (error) {
+      return rowFailure(moduleName, found.key, "failed", `Could not load the database baseline: ${error?.message || error}`);
+    }
+
+    const prior = base.get(found.key);
+    if (!prior || prior.deleted)
+      return { module: moduleName, key: found.key, operation: "delete", status: "saved", at: new Date().toISOString(), message: "Already absent from the database." };
+
+    return softDeleteChildRecord(moduleName, { key: found.key, prior });
+  }
+
   async function appendOnlySync(moduleName, rawStore) {
     let base;
     try {
@@ -2924,6 +3075,51 @@
     };
     if (!item.recordKey) return null;
     return baseline.get(moduleName)?.get(compositeKey(item)) || null;
+  }
+
+  /* ================================================ Stage 17: workflow readiness
+
+     THE QUESTION FOUR MODULES ASK BEFORE USING A WORKFLOW
+
+     They used to ask stage11AReady(), stage11BReady(), stage11CReady() and stage11DReady().
+     Stage 14 retired all four and nothing updated the callers. Because they were written as
+     optional calls - PPMChildDatabase?.stage11AReady?.() - a missing method produced undefined
+     rather than an error, Boolean(undefined) is false, and every workflow quietly reported
+     itself unavailable. Stage gates, plan baselines, budget approvals and scenario publishing
+     all fell back to writing rows directly, which the database refuses. For months.
+
+     So this reports something that is actually true and cannot rot in the same way: a workflow
+     is ready when the function that commits it exists and there is a Supabase client to call it
+     with. If either is missing, the answer is honestly no.
+
+     Named by workflow rather than by migration stage on purpose. "stage11AReady" told a reader
+     nothing about what it gated, and dated badly the moment Stage 11A stopped being recent.
+  */
+  const WORKFLOW_COMMITS = Object.freeze({
+    stageGate: "commitStageGateWorkflow",
+    baseline: "commitBaselineWorkflow",
+    financial: "commitFinancialWorkflow",
+    resourceScenario: "commitResourceScenarioWorkflow"
+  });
+
+  function workflowReady(name) {
+    const commit = WORKFLOW_COMMITS[name];
+    if (!commit) {
+      console.warn(`PPMChildDatabase: "${name}" is not a known workflow.`);
+      return false;
+    }
+    /* The exported object is what a caller would reach, so that is what is checked - not the
+       local function, which exists whether or not it was ever exported. */
+    return Boolean(client()) && typeof window.PPMChildDatabase?.[commit] === "function";
+  }
+
+  /* Every workflow and whether it can currently run. For the console, and for the harness. */
+  function workflowStatus() {
+    return Object.keys(WORKFLOW_COMMITS).map((name) => ({
+      workflow: name,
+      commits: WORKFLOW_COMMITS[name],
+      ready: workflowReady(name)
+    }));
   }
 
   async function commitStageGateWorkflow(payload) {
@@ -3508,6 +3704,8 @@
       matching tables have trigger guards that refuse a direct write.
     */
     commitStageGateWorkflow,
+    workflowReady,
+    workflowStatus,
     commitBaselineWorkflow,
     commitFinancialWorkflow,
     commitResourceScenarioWorkflow,
@@ -3528,6 +3726,9 @@
     explain,
     validateLocal,
     flattenLocal,
+    /* Stage 16: the row-level write path. ppm-data.js is the only intended caller. */
+    saveOne,
+    removeOne,
     compare,
     compareAll,
     selfTest,

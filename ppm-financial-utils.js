@@ -204,7 +204,8 @@
   }
 
   function databaseFinancialWorkflowEnabled() {
-    return Boolean(window.PPMChildDatabase?.stage11CReady?.());
+    /* Stage 17: was stage11CReady(), retired in Stage 14 and silently false ever since. */
+    return Boolean(window.PPMChildDatabase?.workflowReady?.("financial"));
   }
 
   function requestApproval(projectCode, request) {

@@ -570,7 +570,18 @@ async function saveResource(event) {
     };
   else resources.push(resource);
 
-  PPMResources.saveResources(resources);
+  /*
+    Stage 16: awaited, and nothing after it happens unless the database accepted the record.
+    The access-change record below and the audit entry that follows it both describe a change
+    that has been made - writing them after a refused save would record something that did not
+    happen, on the one screen where that matters most.
+  */
+  const saveResult = await PPMResources.saveResources(resources);
+  if (!saveResult.ok) {
+    showMessage(saveResult.message, "error");
+    return;
+  }
+
   if (
     PPMAuth.can("users.manage") &&
     (existing?.accessRole !== resource.accessRole ||
@@ -623,7 +634,7 @@ async function saveResource(event) {
   showMessage(`${resource.fullName} was ${existing ? "updated" : "added"}.`, "success");
 }
 
-function toggleResource(resourceId) {
+async function toggleResource(resourceId) {
   const resource = getResource(resourceId);
   if (!resource) return;
   if (resourceId === PPMAuth.getCurrentUser()?.resourceId && resource.active !== false) {
@@ -640,7 +651,18 @@ function toggleResource(resourceId) {
   const beforeToggle = JSON.parse(JSON.stringify(resource));
   resource.active = willActivate;
   resource.updatedAt = new Date().toISOString();
-  PPMResources.saveResources(resources);
+
+  /* If the database refuses, the in-memory record is put back as it was. Without this the row
+     would keep showing as deactivated until the next reload, which is the screen disagreeing
+     with the database - exactly what this stage exists to stop. */
+  const toggleResult = await PPMResources.saveResources(resources);
+  if (!toggleResult.ok) {
+    Object.assign(resource, beforeToggle);
+    showMessage(toggleResult.message, "error");
+    renderResources();
+    return;
+  }
+
   PPMChangeLog.recordRow({
     before: beforeToggle,
     after: resource,
@@ -676,3 +698,24 @@ document.addEventListener("keydown", function (event) {
 
 populateTeamFilter();
 renderResources();
+
+/*
+  Stage 16: the legacy backfill is now an explicit write rather than a side effect of reading.
+
+  ensureLegacyResources() above derives anybody who exists only in a legacy name field and
+  returns them, but no longer persists them - it is called from eleven places including the
+  top of this file, and a getter cannot save now that saving is awaited. This is the one place
+  that persists it, and it is here because this is the page that owns people.
+
+  Failure is reported rather than swallowed: previously the write happened silently on
+  whichever page called the getter first, so nobody could have known if it had not worked.
+*/
+PPMResources.backfillLegacyResources()
+  .then((result) => {
+    if (result.nothingToDo || result.ok) return;
+    showMessage(
+      `Some people derived from older records could not be saved: ${result.message}`,
+      "error"
+    );
+  })
+  .catch((error) => console.error("The legacy resource backfill failed.", error));

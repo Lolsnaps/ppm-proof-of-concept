@@ -1366,8 +1366,13 @@
     return clone(gate);
   }
 
+  /*
+    Stage 17. Was stage11AReady(), retired in Stage 14, which made this silently false and sent
+    every stage-gate transition down a path the database refuses. See
+    STAGE-17-WORKFLOWS-UNREACHABLE.md.
+  */
   function databaseWorkflowEnabled() {
-    return Boolean(window.PPMChildDatabase?.stage11AReady?.());
+    return Boolean(window.PPMChildDatabase?.workflowReady?.("stageGate"));
   }
 
   function groupedRows(store, projectCode) {
@@ -1389,10 +1394,26 @@
   }
 
   function runTransactionalWorkflow(operation, requestedStatus, callback) {
-    // Preserve the legacy synchronous API while the collection is still local.
-    // Once Stage 11A is database-authoritative the same call returns a Promise,
-    // which the stage-gates page now awaits.
-    if (!databaseWorkflowEnabled()) return callback();
+    /*
+      Stage 17: there is no longer a fallback.
+
+      This used to run the callback directly when the workflow was unavailable, writing the
+      gate, its decision and the project stage as three separate local writes. That path had
+      not worked since Stage 14 - the database refuses every one of those writes through
+      private.guard_stage_gate_workflow_write, which permits a workflow column to change only
+      while the transactional function is running. The refusal went to the console and the
+      screen showed the transition as though it had happened.
+
+      Refusing here instead is the whole point: a governance transition either goes through the
+      transaction that enforces self-approval, segregation of duties and approver eligibility,
+      or it does not happen. Silently doing something weaker is what caused this.
+    */
+    if (!databaseWorkflowEnabled()) {
+      throw new Error(
+        "The governance workflow is unavailable, so this stage-gate change cannot be recorded. " +
+          "Reload the page; if it persists, the database connection or your sign-in has been lost."
+      );
+    }
     if (workflowCapture) return callback();
 
     return (async () => {

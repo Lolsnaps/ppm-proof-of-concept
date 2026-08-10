@@ -28,7 +28,8 @@
   }
 
   function databaseResourceWorkflowEnabled() {
-    return Boolean(window.PPMChildDatabase?.stage11DReady?.());
+    /* Stage 17: was stage11DReady(), retired in Stage 14 and silently false ever since. */
+    return Boolean(window.PPMChildDatabase?.workflowReady?.("resourceScenario"));
   }
 
   function cleanScenarioDemand(item) {
@@ -721,7 +722,7 @@
     return (Array.isArray(plans()[code]) ? plans()[code] : []).find((item) => item.taskId === taskId) || null;
   }
 
-  function saveDemandForm(event) {
+  async function saveDemandForm(event) {
     event.preventDefault();
     showAlert("rmDemandAlert", "");
     const form = event.currentTarget;
@@ -814,7 +815,7 @@
     }
     if (index >= 0) rows[index] = candidate;
     else rows.push(candidate);
-    PPMPlanning.saveDemand(rows);
+    if (!(await saved(PPMPlanning.saveDemand(rows)))) return;
 
     closeModal("rmDemandModal");
     renderDemand();
@@ -866,7 +867,7 @@
     openModal("rmAbsenceModal");
   }
 
-  function saveAbsenceForm(event) {
+  async function saveAbsenceForm(event) {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.checkValidity()) {
@@ -897,7 +898,7 @@
     };
     if (index >= 0) rows[index] = item;
     else rows.push(item);
-    PPMPlanning.saveAbsences(rows);
+    if (!(await saved(PPMPlanning.saveAbsences(rows)))) return;
 
     closeModal("rmAbsenceModal");
     renderAvailability();
@@ -914,7 +915,7 @@
     openModal("rmCapacityModal");
   }
 
-  function saveCapacityForm(event) {
+  async function saveCapacityForm(event) {
     event.preventDefault();
     const under = Number(value("rmUnderThreshold"));
     const warning = Number(value("rmWarningThreshold"));
@@ -926,13 +927,15 @@
       );
       return;
     }
-    PPMPlanning.saveResourceConfig({
+    if (!(await saved(PPMPlanning.saveResourceConfig({
       ...PPMPlanning.getResourceConfig(),
       underUtilisationThreshold: under,
       warningThreshold: warning,
       overAllocationThreshold: over,
       includeProvisionalInCapacity: field("rmIncludeProvisional").checked
-    });
+    })))
+    )
+      return;
     closeModal("rmCapacityModal");
     renderActivePanel();
   }
@@ -1123,7 +1126,7 @@
     setValue("rmScenarioHours", item.hours || 0);
   }
 
-  function saveScenarioAdjustment(event) {
+  async function saveScenarioAdjustment(event) {
     event.preventDefault();
     const scenarios = PPMPlanning.getScenarios();
     const scenario = scenarios.find((item) => item.scenarioId === activeScenarioId);
@@ -1141,10 +1144,25 @@
       ...(scenario.audit || []),
       { action: `Adjusted ${item.demandId}`, at: scenario.updatedAt, by: "Resource planning team" }
     ];
-    PPMPlanning.saveScenarios(scenarios);
+    if (!(await saved(PPMPlanning.saveScenarios(scenarios)))) return;
     closeModal("rmScenarioAdjustModal");
     renderScenarios();
     compareScenario(activeScenarioId);
+  }
+
+  /*
+    Stage 16: every planning write returns { ok, reason, message } instead of the value. This
+    unwraps it in one place - showing the reason and answering false - so the eight call sites
+    below stay readable and none of them can quietly skip the check.
+  */
+  async function saved(promise) {
+    const result = await promise;
+    if (!result || result.ok !== false) return true;
+    showMessage(
+      result.queued ? `${result.message} It is saved on this computer and will be retried.` : result.message,
+      result.queued ? "warning" : "error"
+    );
+    return false;
   }
 
   async function publishScenario(id) {
@@ -1154,6 +1172,48 @@
     const changedDemandItems = scenarioChanges(scenario).length;
 
     try {
+      /*
+        Stage 17: no fallback. The else-branch wrote rows the database refuses through
+        private.guard_resource_scenario_workflow_write, and the refusal was swallowed by the
+        write seam - so a scenario appeared published and was not.
+      */
+      if (!databaseResourceWorkflowEnabled()) {
+        showMessage(
+          "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
+            "the page; if it persists, the database connection or your sign-in has been lost.",
+          "error"
+        );
+        return;
+      }
+
+      /*
+        Stage 17: no fallback. The else-branch wrote rows the database refuses through
+        private.guard_resource_scenario_workflow_write, and the refusal was swallowed by the
+        write seam - so a scenario appeared published and was not.
+      */
+      if (!databaseResourceWorkflowEnabled()) {
+        showMessage(
+          "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
+            "the page; if it persists, the database connection or your sign-in has been lost.",
+          "error"
+        );
+        return;
+      }
+
+      /*
+        Stage 17: no fallback. The else-branch wrote rows the database refuses through
+        private.guard_resource_scenario_workflow_write, and the refusal was swallowed by the
+        write seam - so a scenario appeared published and was not.
+      */
+      if (!databaseResourceWorkflowEnabled()) {
+        showMessage(
+          "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
+            "the page; if it persists, the database connection or your sign-in has been lost.",
+          "error"
+        );
+        return;
+      }
+
       if (databaseResourceWorkflowEnabled()) {
         const result = await PPMChildDatabase.commitResourceScenarioWorkflow({
           operation: "publish",
@@ -1163,9 +1223,14 @@
 
       } else {
         const now = new Date().toISOString();
-        PPMPlanning.saveDemand(
-          (scenario.demands || []).map((item) => ({ ...item, updatedAt: now, scenarioPublishedFrom: id }))
-        );
+        if (
+          !(await saved(
+            PPMPlanning.saveDemand(
+              (scenario.demands || []).map((item) => ({ ...item, updatedAt: now, scenarioPublishedFrom: id }))
+            )
+          ))
+        )
+          return;
         scenario.status = "Published";
         scenario.publishedAt = now;
         scenario.updatedAt = now;
@@ -1173,7 +1238,7 @@
           ...(scenario.audit || []),
           { action: "Published to live demand", at: now, by: "Resource planning team" }
         ];
-        PPMPlanning.saveScenarios(scenarios);
+        if (!(await saved(PPMPlanning.saveScenarios(scenarios)))) return;
 
       }
       renderScenarios();
@@ -1205,7 +1270,7 @@
           ...(scenario.audit || []),
           { action: "Rejected", at: now, by: "Resource planning team" }
         ];
-        PPMPlanning.saveScenarios(scenarios);
+        if (!(await saved(PPMPlanning.saveScenarios(scenarios)))) return;
 
       }
       renderScenarios();

@@ -111,17 +111,49 @@
     return parseJson(localStorage.getItem(key), fallback);
   }
 
-  function rawWrite(key, value) {
-    if (window.PPMAuth && typeof window.PPMAuth.writeGlobal === "function") {
-      window.PPMAuth.writeGlobal(key, value, "paired with the unfiltered read above");
-    } else {
-      localStorage.setItem(key, JSON.stringify(value));
+  /*
+    Stage 16: the second write seam is gone.
+
+    This used PPMAuth.writeGlobal, which existed specifically to bypass the patched
+    localStorage - and that is exactly what caused the Stage 12 bug. The child adapter hooked
+    only Storage.prototype.setItem, so every configuration store here saved locally and never
+    reached PostgreSQL, with no error anywhere: lifecycle templates, reference data, mandatory
+    rules, RAG thresholds, calendars and periods, all silently browser-only.
+
+    A design needing two independent interceptions to stay in step will eventually have one of
+    them missing. There is one way in now, and it says what happened.
+
+    The collection is looked up from the key rather than mapped by hand, so adding a
+    configuration store to an adapter is all it takes to make it writable.
+  */
+  async function rawWrite(key, value) {
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so nothing was saved.",
+        queued: false
+      };
     }
-    return value;
+    const collection = window.PPMStore.collectionFor(key);
+    if (!collection) {
+      return {
+        ok: false,
+        reason: "invalid",
+        message: `No collection is registered for "${key}", so it cannot be saved.`,
+        queued: false
+      };
+    }
+    return window.PPMStore.replaceAll(collection, value);
   }
 
-  function write(key, value, detail) {
-    const result = rawWrite(key, value);
+  /*
+    The change event now fires only after the database has accepted the write. It used to fire
+    regardless, so every listener redrew itself from a value that might never have been saved.
+  */
+  async function write(key, value, detail) {
+    const result = await rawWrite(key, value);
+    if (!result.ok) return result;
     window.dispatchEvent(
       new CustomEvent("ppm-admin-changed", {
         detail: { key, value: clone(value), ...(detail || {}) }
@@ -178,12 +210,16 @@
   }
 
 
-  function saveCollection(key, value, entityType, options) {
-    const settings = options || {};
-    const result = write(key, value, { entityType });
-    if (settings.audit !== false) {
-    }
-    return result;
+  /*
+    Returns the database result with the saved value attached. It used to return the value
+    alone, which is why every caller simply passed it on - there was nothing else to report.
+    There is now, and a caller that ignores result.ok is one that will tell somebody their
+    configuration was saved when it was refused.
+  */
+  async function saveCollection(key, value, entityType, options) {
+    void (options || {});
+    const result = await write(key, value, { entityType });
+    return { ...result, value: clone(value) };
   }
 
   function defaultPortfolio() {
@@ -299,12 +335,14 @@
       !Array.isArray(stored) ||
       !stored.length ||
       JSON.stringify(rows.filter(Boolean).map(normalisePortfolio)) !== JSON.stringify(normalised)
-    )
-      rawWrite(KEYS.portfolios, normalised);
+    ) {
+    /* Stage 16: derived only. seedDefaults() is what persists the defaults, once. */
+    }
     return clone(normalised);
   }
 
-  function syncProgrammePortfolioReferences(portfolios) {
+  /* Stage 16: async, because it writes. Both callers await it. */
+  async function syncProgrammePortfolioReferences(portfolios) {
     const programmes = read("ppmProgrammes", []);
     if (!Array.isArray(programmes) || !programmes.length) return;
     const portfolioByProgramme = new Map();
@@ -337,10 +375,11 @@
         changed = true;
       }
     });
-    if (changed) rawWrite("ppmProgrammes", programmes);
+    if (changed) return rawWrite("ppmProgrammes", programmes);
+    return { ok: true, saved: 0, nothingToDo: true };
   }
 
-  function savePortfolios(rows, options) {
+  async function savePortfolios(rows, options) {
     let values = (Array.isArray(rows) ? rows : [])
       .filter(Boolean)
       .map((row, index) => normalisePortfolio({ ...row, updatedAt: row.updatedAt || nowIso() }, index));
@@ -363,12 +402,22 @@
     values = values.map(
       (portfolio) => ordered.find((row) => row.portfolioId === portfolio.portfolioId) || portfolio
     );
-    const saved = saveCollection(KEYS.portfolios, values, "Portfolio", options);
-    syncProgrammePortfolioReferences(saved);
-    return reconcileProgrammeMembership().portfolios;
+    const saved = await saveCollection(KEYS.portfolios, values, "Portfolio", options);
+    if (!saved.ok) return saved;
+    const synced = await syncProgrammePortfolioReferences(saved.value);
+    if (synced && synced.ok === false) return synced;
+    const reconciled = await reconcileProgrammeMembership();
+    if (reconciled && reconciled.ok === false) return reconciled;
+    return { ...saved, value: reconciled.portfolios };
   }
 
-  function reconcileProgrammeMembership() {
+  /*
+    Stage 16: async, and every write inside is awaited. It brings portfolios, programmes and
+    projects into line with each other, so three writes have to succeed - and a caller now
+    learns if one of them did not, rather than the screen showing a membership the database
+    never accepted.
+  */
+  async function reconcileProgrammeMembership() {
     const storedPortfolios = read(KEYS.portfolios, null);
     const portfolios = (
       Array.isArray(storedPortfolios) && storedPortfolios.length ? storedPortfolios : [defaultPortfolio()]
@@ -397,8 +446,12 @@
         programmesChanged = true;
       }
     });
-    rawWrite(KEYS.portfolios, portfolios);
-    if (programmesChanged) rawWrite("ppmProgrammes", programmes);
+    const portfolioResult = await rawWrite(KEYS.portfolios, portfolios);
+    if (!portfolioResult.ok) return { ...portfolioResult, portfolios };
+    if (programmesChanged) {
+      const programmeResult = await rawWrite("ppmProgrammes", programmes);
+      if (!programmeResult.ok) return { ...programmeResult, portfolios };
+    }
 
     const projects = read("ppmProjects", []);
     let projectsChanged = false;
@@ -429,7 +482,10 @@
         project.updatedAt = nowIso();
         projectsChanged = true;
       });
-      if (projectsChanged) rawWrite("ppmProjects", projects);
+      if (projectsChanged) {
+        const projectResult = await rawWrite("ppmProjects", projects);
+        if (!projectResult.ok) return { ...projectResult, portfolios };
+      }
     }
     return {
       portfolios: clone(portfolios),
@@ -544,17 +600,17 @@
       const firstActive = rows.find((row) => row.active) || rows[0];
       if (firstActive) firstActive.isDefault = true;
     }
-    if (!Array.isArray(stored) || !stored.length) rawWrite(KEYS.lifecycleTemplates, rows);
+    /* Stage 16: derived only. seedDefaults() is what persists the defaults, once. */
     return clone(rows);
   }
 
-  function saveLifecycleTemplates(rows, options) {
+  async function saveLifecycleTemplates(rows, options) {
     let values = (Array.isArray(rows) ? rows : []).filter(Boolean).map(normaliseTemplate);
     const defaultId =
       values.find((row) => row.isDefault && row.active)?.templateId ||
       values.find((row) => row.active)?.templateId;
     values = values.map((row) => ({ ...row, isDefault: row.templateId === defaultId }));
-    return clone(saveCollection(KEYS.lifecycleTemplates, values, "Lifecycle template", options));
+    return saveCollection(KEYS.lifecycleTemplates, values, "Lifecycle template", options);
   }
 
   function nextLifecycleTemplateId(rows) {
@@ -618,7 +674,7 @@
     );
   }
 
-  function migrateLegacyProjectLifecycleAssignments(projectRows) {
+  function deriveLegacyProjectLifecycleAssignments(projectRows) {
     const supplied = Array.isArray(projectRows);
     const stored = supplied ? projectRows : read("ppmProjects", null);
     if (!Array.isArray(stored)) return [];
@@ -669,11 +725,28 @@
         if (!project.lifecycleAssignmentSource) project.lifecycleAssignmentSource = assignmentSource;
       }
     });
-    if (changed) {
-      if (supplied) localStorage.setItem("ppmProjects", JSON.stringify(projects));
-      else rawWrite("ppmProjects", projects);
+    /*
+      Stage 16: pure. This used to persist whichever way it had been called - straight to
+      localStorage when handed rows, through the writeGlobal seam when not. Two write paths
+      inside one function that four external call sites use inline, in expressions, and none
+      of them could have awaited either.
+    */
+    return { projects: clone(projects), changed };
+  }
+
+  /* The old name and the old contract: returns the migrated projects, writes nothing. */
+  function migrateLegacyProjectLifecycleAssignments(projectRows) {
+    return deriveLegacyProjectLifecycleAssignments(projectRows).projects;
+  }
+
+  /* The write half, called from seedDefaults(). */
+  async function backfillLegacyProjectLifecycleAssignments(projectRows) {
+    const { projects, changed } = deriveLegacyProjectLifecycleAssignments(projectRows);
+    if (!changed) return { ok: true, saved: 0, nothingToDo: true };
+    if (!window.PPMStore) {
+      return { ok: false, reason: "failed", message: "The data layer is not loaded on this page.", queued: false };
     }
-    return clone(projects);
+    return window.PPMStore.projects.replaceAll(projects);
   }
 
   function referenceRow(category, value, index) {
@@ -734,14 +807,12 @@
   function getReferenceData() {
     const stored = read(KEYS.referenceData, null);
     const values = normaliseReferenceData(stored || defaultReferenceData());
-    if (!stored) rawWrite(KEYS.referenceData, values);
+    /* Stage 16: derived only. seedDefaults() is what persists the defaults, once. */
     return clone(values);
   }
 
-  function saveReferenceData(value, options) {
-    return clone(
-      saveCollection(KEYS.referenceData, normaliseReferenceData(value), "Reference data", options)
-    );
+  async function saveReferenceData(value, options) {
+    return saveCollection(KEYS.referenceData, normaliseReferenceData(value), "Reference data", options);
   }
 
   function getReferenceValues(category, options) {
@@ -982,11 +1053,11 @@
       .filter(Boolean)
       .map((row, index) => normaliseRule(row, index, templateVersions[row.templateId || "LIFE-00001"] || 1));
     if (!Array.isArray(stored) || !stored.length || versionMigrationRequired)
-      rawWrite(KEYS.mandatoryRules, rows);
+    /* Stage 16: derived only. seedDefaults() is what persists the defaults, once. */
     return clone(rows);
   }
 
-  function saveMandatoryRules(rows, options) {
+  async function saveMandatoryRules(rows, options) {
     const templateVersions = Object.fromEntries(
       getLifecycleTemplates().map((row) => [row.templateId, Number(row.version || 1)])
     );
@@ -995,7 +1066,7 @@
       .map((row, index) =>
         normaliseRule({ ...row, updatedAt: nowIso() }, index, templateVersions[row.templateId] || 1)
       );
-    return clone(saveCollection(KEYS.mandatoryRules, values, "Lifecycle mandatory rule", options));
+    return saveCollection(KEYS.mandatoryRules, values, "Lifecycle mandatory rule", options);
   }
 
   function getMandatoryRulesForTemplateVersion(templateId, templateVersion) {
@@ -1215,13 +1286,13 @@
     return clone({ ...DEFAULT_RAG_CONFIG, ...(stored && typeof stored === "object" ? stored : {}) });
   }
 
-  function saveRagConfig(config, options) {
+  async function saveRagConfig(config, options) {
     const current = getRagConfig();
     const values = { ...current, ...(config || {}), updatedAt: nowIso(), updatedBy: actorName() };
     Object.keys(DEFAULT_RAG_CONFIG).forEach((key) => {
       values[key] = Number(values[key]);
     });
-    return clone(saveCollection(KEYS.ragConfig, values, "RAG threshold", options));
+    return saveCollection(KEYS.ragConfig, values, "RAG threshold", options);
   }
 
   function defaultReportingCalendar() {
@@ -1270,17 +1341,17 @@
       const first = rows.find((row) => row.active) || rows[0];
       if (first) first.isDefault = true;
     }
-    if (!Array.isArray(stored) || !stored.length) rawWrite(KEYS.reportingCalendars, rows);
+    /* Stage 16: derived only. seedDefaults() is what persists the defaults, once. */
     return clone(rows);
   }
 
-  function saveReportingCalendars(rows, options) {
+  async function saveReportingCalendars(rows, options) {
     let values = (Array.isArray(rows) ? rows : []).filter(Boolean).map(normaliseCalendar);
     const defaultId =
       values.find((row) => row.isDefault && row.active)?.calendarId ||
       values.find((row) => row.active)?.calendarId;
     values = values.map((row) => ({ ...row, isDefault: row.calendarId === defaultId }));
-    return clone(saveCollection(KEYS.reportingCalendars, values, "Reporting calendar", options));
+    return saveCollection(KEYS.reportingCalendars, values, "Reporting calendar", options);
   }
 
   function nextReportingCalendarId(rows) {
@@ -1312,11 +1383,11 @@
     return clone(calendarId ? rows.filter((row) => row.calendarId === calendarId) : rows);
   }
 
-  function saveReportingPeriods(rows, options) {
+  async function saveReportingPeriods(rows, options) {
     const values = (Array.isArray(rows) ? rows : [])
       .filter(Boolean)
       .map((row, index) => normalisePeriod({ ...row, updatedAt: nowIso() }, index));
-    return clone(saveCollection(KEYS.reportingPeriods, values, "Reporting period", options));
+    return saveCollection(KEYS.reportingPeriods, values, "Reporting period", options);
   }
 
   function periodStatus(startDate, endDate, locked) {
@@ -1469,16 +1540,28 @@
     return clone(combined.filter((row) => row.calendarId === calendar.calendarId));
   }
 
-  function seedDefaults() {
-    getPortfolios();
-    getLifecycleTemplates();
-    getReferenceData();
-    getMandatoryRules();
-    getRagConfig();
+  async function seedDefaults() {
+    /*
+      Stage 16: seeding happens here, explicitly and awaited, rather than as a side effect of
+      each getter. Every configuration getter used to persist its own defaults on first read -
+      nine more writes hidden inside functions named get. Once writes became asynchronous those
+      would have been floating promises nobody could see fail.
+    */
+    await rawWrite(KEYS.portfolios, getPortfolios());
+    await rawWrite(KEYS.lifecycleTemplates, getLifecycleTemplates());
+    await rawWrite(KEYS.referenceData, getReferenceData());
+    await rawWrite(KEYS.mandatoryRules, getMandatoryRules());
+    await rawWrite(KEYS.ragConfig, getRagConfig());
     const calendars = getReportingCalendars();
-    if (!read(KEYS.reportingPeriods, null)) rawWrite(KEYS.reportingPeriods, []);
-    migrateLegacyProjectLifecycleAssignments();
-    rawWrite(KEYS.schemaVersion, SCHEMA_VERSION);
+    await rawWrite(KEYS.reportingCalendars, calendars);
+    if (!read(KEYS.reportingPeriods, null)) await rawWrite(KEYS.reportingPeriods, []);
+    await backfillLegacyProjectLifecycleAssignments();
+    /*
+      The schema version marks this browser, not a business collection - there is no table for
+      it and PPMStore would rightly refuse it. It stays in localStorage, which is the one reason
+      ppm-admin-utils.js remains on the Stage 16 list in VERIFY-STATIC.mjs.
+    */
+    localStorage.setItem(KEYS.schemaVersion, JSON.stringify(SCHEMA_VERSION));
     return {
       portfolios: getPortfolios(),
       lifecycleTemplates: getLifecycleTemplates(),
@@ -1508,6 +1591,7 @@
     getTemplateForProject,
     projectStages,
     migrateLegacyProjectLifecycleAssignments,
+    backfillLegacyProjectLifecycleAssignments,
     getReferenceData,
     saveReferenceData,
     getReferenceValues,
@@ -1544,5 +1628,16 @@
     */
   });
 
-  seedDefaults();
+  /*
+    Stage 16: seeding is asynchronous now, because it writes to the database.
+
+    Nothing awaits this and nothing can - it runs while the module is being defined, before any
+    page script exists. That is acceptable for seeding specifically: it writes defaults that are
+    already present in memory, so a page renders correctly whether or not the write has landed.
+    What is not acceptable is failing silently, which is what the old fire-and-forget writes did,
+    so the failure is reported.
+  */
+  seedDefaults().catch((error) =>
+    console.error("PPMAdmin: the default configuration could not be saved.", error)
+  );
 })();

@@ -28,6 +28,30 @@
     return canAdmin() || !window.PPMAuth || Boolean(PPMAuth.can("portfolios.edit"));
   }
 
+  /*
+    Stage 16: every configuration save goes through here.
+
+    PPMAdmin now returns { ok, reason, message, value } instead of the saved value, because a
+    write can be refused - by row-level security, by a version clash, or by being offline. This
+    unwraps it: on success the caller gets the value it used to get, and on failure it gets the
+    value it already had, the reason on screen, and false so it can stop.
+
+    The alternative was four extra lines at each of thirteen call sites, which is how one of
+    them quietly ends up not checking.
+  */
+  async function persist(promise, current) {
+    const result = await promise;
+    if (result && result.ok) return { ok: true, value: result.value };
+    const message = (result && result.message) || "The change could not be saved.";
+    showMessage(
+      result && result.queued
+        ? `${message} It is saved on this computer and will be retried.`
+        : message,
+      result && result.queued ? "warning" : "error"
+    );
+    return { ok: false, value: current };
+  }
+
   function showMessage(message, type) {
     const box = el("pageMessage");
     box.textContent = message;
@@ -326,7 +350,7 @@
     el("portfolioModal").classList.remove("visible");
   }
 
-  function savePortfolio(event) {
+  async function savePortfolio(event) {
     event.preventDefault();
     if (!assertPortfolioEdit()) return;
     const name = el("portfolioName").value.trim();
@@ -398,17 +422,19 @@
     const index = state.portfolios.findIndex((row) => row.portfolioId === editingPortfolioId);
     if (index >= 0) state.portfolios[index] = record;
     else state.portfolios.push(record);
-    state.portfolios = PPMAdmin.savePortfolios(state.portfolios, {
+    const portfoliosResult = await persist(PPMAdmin.savePortfolios(state.portfolios, {
       entityId: id,
       action: existing ? "Portfolio updated" : "Portfolio created",
       summary: `${name} was ${existing ? "updated" : "created"}.`
-    });
+    }), state.portfolios);
+    if (!portfoliosResult.ok) return;
+    state.portfolios = portfoliosResult.value;
     closePortfolio();
     refresh();
     showMessage(`${name} was saved.`);
   }
 
-  function retirePortfolio(id) {
+  async function retirePortfolio(id) {
     if (!assertPortfolioEdit()) return;
     const row = state.portfolios.find((item) => item.portfolioId === id);
     if (!row) return;
@@ -423,15 +449,17 @@
     confirmChange(
       `Retire ${row.name}?${linked ? ` ${linked} linked project${linked === 1 ? " remains" : "s remain"} visible and will retain the portfolio reference.` : ""} The record and audit history will be retained.`,
       "Retire portfolio",
-      () => {
+      async () => {
         row.active = false;
         row.status = "Inactive";
         row.updatedAt = new Date().toISOString();
-        state.portfolios = PPMAdmin.savePortfolios(state.portfolios, {
+        const portfoliosResult = await persist(PPMAdmin.savePortfolios(state.portfolios, {
           entityId: id,
           action: "Portfolio retired",
           summary: `${row.name} was retired.`
-        });
+        }), state.portfolios);
+        if (!portfoliosResult.ok) return;
+        state.portfolios = portfoliosResult.value;
         closeConfirmation();
         refresh();
         showMessage(`${row.name} was retired.`);
@@ -728,7 +756,7 @@
     );
   }
 
-  function saveTemplate() {
+  async function saveTemplate() {
     if (!assertEdit()) return;
     const existingStored = PPMAdmin.getLifecycleTemplates().find(
       (row) => row.templateId === selectedTemplateId
@@ -802,17 +830,21 @@
       state.templates.forEach((row) => {
         if (row.templateId !== record.templateId) row.isDefault = false;
       });
-    state.templates = PPMAdmin.saveLifecycleTemplates(state.templates, {
+    const templatesResult = await persist(PPMAdmin.saveLifecycleTemplates(state.templates, {
       entityId: record.templateId,
       action: existingStored ? "Lifecycle template version saved" : "Lifecycle template created",
       summary: `${record.name} version ${record.version} was saved.`
-    });
-    state.rules = PPMAdmin.saveMandatoryRules(rulesToSave, { audit: false });
+    }), state.templates);
+    if (!templatesResult.ok) return;
+    state.templates = templatesResult.value;
+    const rulesResult = await persist(PPMAdmin.saveMandatoryRules(rulesToSave, { audit: false }), state.rules);
+    if (!rulesResult.ok) return;
+    state.rules = rulesResult.value;
     refresh();
     showMessage(`${record.name} version ${record.version} was saved.`);
   }
 
-  function retireTemplate() {
+  async function retireTemplate() {
     if (!assertEdit()) return;
     const row = state.templates.find((item) => item.templateId === selectedTemplateId);
     if (!row || !row.active) return;
@@ -831,17 +863,19 @@
     confirmChange(
       `Retire ${row.name}?${linked ? ` ${linked} existing project${linked === 1 ? " will" : "s will"} retain this lifecycle version.` : ""} It will no longer be offered for new projects.`,
       "Retire template",
-      () => {
+      async () => {
         row.active = false;
         row.isDefault = false;
         const replacement = state.templates.find((item) => item.active && item.templateId !== row.templateId);
         if (replacement && !state.templates.some((item) => item.active && item.isDefault))
           replacement.isDefault = true;
-        state.templates = PPMAdmin.saveLifecycleTemplates(state.templates, {
+        const templatesResult = await persist(PPMAdmin.saveLifecycleTemplates(state.templates, {
           entityId: row.templateId,
           action: "Lifecycle template retired",
           summary: `${row.name} was retired.`
-        });
+        }), state.templates);
+        if (!templatesResult.ok) return;
+        state.templates = templatesResult.value;
         closeConfirmation();
         refresh();
         showMessage(`${row.name} was retired.`);
@@ -1001,7 +1035,7 @@
     );
   }
 
-  function saveRules() {
+  async function saveRules() {
     if (!assertEdit()) return;
     const persistedTemplates = PPMAdmin.getLifecycleTemplates();
     const persistedTemplate = persistedTemplates.find(
@@ -1050,16 +1084,20 @@
     }
     const templateIndex = persistedTemplates.findIndex((row) => row.templateId === nextTemplate.templateId);
     persistedTemplates[templateIndex] = nextTemplate;
-    state.templates = PPMAdmin.saveLifecycleTemplates(persistedTemplates, {
+    const templatesResult = await persist(PPMAdmin.saveLifecycleTemplates(persistedTemplates, {
       entityId: nextTemplate.templateId,
       action: "Lifecycle validation version saved",
       summary: `${nextTemplate.name} version ${nextTemplate.version} was created when mandatory-field rules changed.`
-    });
-    state.rules = PPMAdmin.saveMandatoryRules([...persistedRules, ...nextRules], {
+    }), state.templates);
+    if (!templatesResult.ok) return;
+    state.templates = templatesResult.value;
+    const rulesResult = await persist(PPMAdmin.saveMandatoryRules([...persistedRules, ...nextRules], {
       entityId: `${nextTemplate.templateId}:${nextTemplate.version}:${currentRuleScope().stage}`,
       action: "Mandatory field rules updated",
       summary: `Mandatory field rules for ${currentRuleScope().stage} were updated in lifecycle version ${nextTemplate.version}.`
-    });
+    }), state.rules);
+    if (!rulesResult.ok) return;
+    state.rules = rulesResult.value;
     refresh();
     showMessage(`Mandatory field rules were saved as ${nextTemplate.name} version ${nextTemplate.version}.`);
   }
@@ -1139,7 +1177,7 @@
       }
     );
   }
-  function saveReferences() {
+  async function saveReferences() {
     if (!assertEdit()) return;
     const rows = captureReferences();
     if (rows.some((row) => !row.code || !row.label || !row.value)) {
@@ -1151,11 +1189,13 @@
       showMessage("Reference codes must be unique within a category.", "error");
       return;
     }
-    state.references = PPMAdmin.saveReferenceData(state.references, {
+    const referencesResult = await persist(PPMAdmin.saveReferenceData(state.references, {
       entityId: el("referenceCategory").value,
       action: "Reference data updated",
       summary: `${el("referenceCategory").selectedOptions[0]?.textContent || "Reference data"} was updated.`
-    });
+    }), state.references);
+    if (!referencesResult.ok) return;
+    state.references = referencesResult.value;
     refresh();
     showMessage("Reference data was saved.");
   }
@@ -1165,7 +1205,7 @@
       if (el(key)) el(key).value = state.rag[key];
     });
   }
-  function saveRag() {
+  async function saveRag() {
     if (!assertEdit()) return;
     const values = Object.fromEntries(
       Object.keys(PPMAdmin.DEFAULT_RAG_CONFIG).map((key) => [key, Number(el(key).value)])
@@ -1178,10 +1218,12 @@
       showMessage("Each Red threshold must be greater than its Amber threshold.", "error");
       return;
     }
-    state.rag = PPMAdmin.saveRagConfig(values, {
+    const ragResult = await persist(PPMAdmin.saveRagConfig(values, {
       action: "RAG thresholds updated",
       summary: "Calculated RAG thresholds were updated."
-    });
+    }), state.rag);
+    if (!ragResult.ok) return;
+    state.rag = ragResult.value;
     renderRag();
     showMessage("RAG thresholds were saved and will be used by project calculations.");
   }
@@ -1257,7 +1299,7 @@
     editingCalendarId = "";
     el("calendarModal").classList.remove("visible");
   }
-  function saveCalendar(event) {
+  async function saveCalendar(event) {
     event.preventDefault();
     if (!assertEdit()) return;
     const name = el("calendarName").value.trim();
@@ -1289,17 +1331,19 @@
       state.calendars.forEach((row) => {
         if (row.calendarId !== record.calendarId) row.isDefault = false;
       });
-    state.calendars = PPMAdmin.saveReportingCalendars(state.calendars, {
+    const calendarsResult = await persist(PPMAdmin.saveReportingCalendars(state.calendars, {
       entityId: record.calendarId,
       action: existing ? "Reporting calendar updated" : "Reporting calendar created",
       summary: `${name} was ${existing ? "updated" : "created"}.`
-    });
+    }), state.calendars);
+    if (!calendarsResult.ok) return;
+    state.calendars = calendarsResult.value;
     selectedCalendarId = record.calendarId;
     closeCalendar();
     refresh();
     showMessage(`${name} was saved.`);
   }
-  function retireCalendar(id) {
+  async function retireCalendar(id) {
     if (!assertEdit()) return;
     const row = state.calendars.find((item) => item.calendarId === id);
     if (!row) return;
@@ -1310,17 +1354,19 @@
     confirmChange(
       `Retire ${row.name}? Existing reporting periods and reports remain available.`,
       "Retire calendar",
-      () => {
+      async () => {
         row.active = false;
         row.isDefault = false;
         const replacement = state.calendars.find((item) => item.active && item.calendarId !== id);
         if (replacement && !state.calendars.some((item) => item.active && item.isDefault))
           replacement.isDefault = true;
-        state.calendars = PPMAdmin.saveReportingCalendars(state.calendars, {
+        const calendarsResult = await persist(PPMAdmin.saveReportingCalendars(state.calendars, {
           entityId: id,
           action: "Reporting calendar retired",
           summary: `${row.name} was retired.`
-        });
+        }), state.calendars);
+        if (!calendarsResult.ok) return;
+        state.calendars = calendarsResult.value;
         closeConfirmation();
         refresh();
         showMessage(`${row.name} was retired.`);
@@ -1426,7 +1472,7 @@
       }
     );
   }
-  function savePeriods() {
+  async function savePeriods() {
     if (!assertEdit()) return;
     const rows = capturePeriods();
     if (rows.some((row) => !row.name || !row.startDate || !row.endDate || !row.submissionDueDate)) {
@@ -1437,18 +1483,22 @@
       showMessage("A reporting period finish date cannot be before its start date.", "error");
       return;
     }
-    state.periods = PPMAdmin.saveReportingPeriods(state.periods, {
+    const periodsResult = await persist(PPMAdmin.saveReportingPeriods(state.periods, {
       entityId: selectedCalendarId,
       action: "Reporting periods updated",
       summary: `Reporting periods for ${state.calendars.find((row) => row.calendarId === selectedCalendarId)?.name || selectedCalendarId} were updated.`
-    });
+    }), state.periods);
+    if (!periodsResult.ok) return;
+    state.periods = periodsResult.value;
     refresh();
     showMessage("Reporting periods were saved.");
   }
-  function generatePeriods() {
+  async function generatePeriods() {
     if (!assertEdit()) return;
     capturePeriods();
-    PPMAdmin.saveReportingPeriods(state.periods, { audit: false });
+    const generated = await persist(PPMAdmin.saveReportingPeriods(state.periods, { audit: false }), state.periods);
+    if (!generated.ok) return;
+    state.periods = generated.value;
     const count = Number(el("generateCount").value || 12);
     const before = state.periods.filter((row) => row.calendarId === selectedCalendarId).length;
     PPMAdmin.ensureReportingPeriods(selectedCalendarId, { count });

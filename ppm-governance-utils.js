@@ -70,15 +70,41 @@
     });
   }
 
-  function saveProgrammes(programmes) {
+  /*
+    Stage 16: the one write seam.
+
+    The old signature returned the normalised programmes, and two callers assigned from it.
+    Normalising and saving are different jobs, so they are separate now: normaliseProgrammes()
+    is pure and callers use it directly, and this returns what the database said. The
+    normalised list is included on the result so the assignment at the call site still has
+    something to assign - but it is no longer the only thing coming back, which is the point.
+  */
+  async function saveProgrammes(programmes) {
     const normalised = normaliseProgrammes(programmes);
-    localStorage.setItem(PROGRAMME_STORAGE_KEY, JSON.stringify(normalised));
-    return normalised;
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so nothing was saved.",
+        queued: false,
+        programmes: normalised
+      };
+    }
+    const result = await window.PPMStore.programmes.replaceAll(normalised);
+    return { ...result, programmes: normalised };
   }
 
-  function migrateProjectProgrammeReferences(programmes) {
+  /*
+    Stage 16: awaited, and only the projects that actually changed are written.
+
+    This rewrote every project in the portfolio whenever any one of their programme references
+    had drifted - the read-modify-write that let two people editing different projects
+    overwrite each other. replaceAll writes only the rows that differ, each against its own
+    version, so an untouched project is not written at all.
+  */
+  async function migrateProjectProgrammeReferences(programmes) {
     const projects = parseJson(localStorage.getItem(PROJECT_STORAGE_KEY), []);
-    if (!Array.isArray(projects)) return;
+    if (!Array.isArray(projects)) return { ok: true, saved: 0, nothingToDo: true };
     let changed = false;
     projects.forEach((project) => {
       const byId = programmes.find((programme) => programme.programmeId === project.programmeId);
@@ -95,20 +121,46 @@
         changed = true;
       }
     });
-    if (changed) localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+    if (!changed) return { ok: true, saved: 0, nothingToDo: true };
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so programme references were not updated.",
+        queued: false
+      };
+    }
+    return window.PPMStore.projects.replaceAll(projects);
   }
 
+  /*
+    Stage 16: read and write separated, for the same reason as the resources getter.
+
+    This wrote on every single call - it saved the programmes and then rewrote every project
+    whose programme reference had drifted, on a function named "get". Sixteen call sites across
+    six files use the return value, so it cannot become asynchronous, and it should never have
+    been writing in the first place.
+
+    Seeding the defaults is part of deriving, not part of saving: a portfolio with no
+    programmes yet still needs the default list to render, and backfillProgrammes() is what
+    makes that permanent.
+  */
   function getProgrammes() {
     const stored = parseJson(localStorage.getItem(PROGRAMME_STORAGE_KEY), null);
-    let programmes;
-    if (Array.isArray(stored) && stored.length) {
-      programmes = normaliseProgrammes(stored);
-    } else {
-      programmes = DEFAULT_PROGRAMME_NAMES.map(defaultProgramme);
-    }
-    programmes = saveProgrammes(programmes);
-    migrateProjectProgrammeReferences(programmes);
-    return programmes;
+    if (Array.isArray(stored) && stored.length) return normaliseProgrammes(stored);
+    return DEFAULT_PROGRAMME_NAMES.map(defaultProgramme);
+  }
+
+  /*
+    The write half: persist the programmes, then bring project references into line with them.
+    Called once where it matters rather than on every read.
+  */
+  async function backfillProgrammes() {
+    const programmes = getProgrammes();
+    const result = await saveProgrammes(programmes);
+    if (!result.ok) return result;
+    const references = await migrateProjectProgrammeReferences(result.programmes);
+    return references && references.ok === false ? references : result;
   }
 
   function nextProgrammeId(programmes) {
@@ -239,6 +291,8 @@
     STAGE_ORDER,
     getProgrammes,
     saveProgrammes,
+    backfillProgrammes,
+    normaliseProgrammes,
     nextProgrammeId,
     findProgramme,
     populateProgrammeSelect,
