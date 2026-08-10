@@ -1521,9 +1521,34 @@
         Network failures and refusals are different. There the local copy may be
         the only copy of a change that never landed, so those still block.
       */
+      /*
+        Stage 16: a refusal is terminal, so it must not block hydration either.
+
+        The reasoning above is right for a network failure - a retry may still land, so the
+        local copy is worth protecting. It is wrong for a refusal. Row-level security or a
+        workflow guard has permanently rejected that change; no amount of waiting will make it
+        succeed. Blocking on it meant the collection was never refreshed again in that browser,
+        so the screen showed indefinitely stale data while the console explained why once, on
+        load, to nobody.
+
+        Found in the field: a plan baseline refused on 9 August was still blocking every
+        subsequent refresh of planBaselines two days later.
+
+        The entry is kept, so pendingWrites() can still show what was rejected and why. What
+        changes is that the database is allowed to win, which it already had.
+      */
       const pendingHere = readPending().filter((p) => p.module === name);
-      const stuck = pendingHere.filter((p) => p.kind !== "conflict");
+      const stuck = pendingHere.filter((p) => p.kind !== "conflict" && p.kind !== "refused");
       const staleConflicts = pendingHere.filter((p) => p.kind === "conflict");
+      const refusals = pendingHere.filter((p) => p.kind === "refused");
+
+      if (refusals.length) {
+        console.warn(
+          `PPMDatabase: ${refusals.length} "${name}" change(s) were refused by the database and cannot be retried. ` +
+            `Refreshing anyway - the database copy is the real one. Run PPMDatabase.pendingWrites() to see what was ` +
+            `rejected, then PPMDatabase.clearPendingFor("${name}", "refused") once you have noted it.`
+        );
+      }
 
       if (staleConflicts.length && !stuck.length) {
         clearPendingFor(name, "conflict");

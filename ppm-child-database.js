@@ -2389,7 +2389,31 @@
       }
     }
 
-    const stillBlocking = pendingFor(moduleName).filter((row) => row.kind !== "conflict");
+    /*
+      Stage 16: a refusal is terminal and must not block hydration.
+
+      A network failure may still land on retry, so its local copy is worth protecting. A
+      refusal will not: the database has permanently rejected it. Blocking on one meant this
+      collection was never refreshed again in that browser - stale for ever, explained once in
+      a console message on load.
+
+      Found in the field: a plan baseline refused on 9 August was still blocking every refresh
+      of planBaselines two days later. The entry stays in the pending log so pendingWrites()
+      can still report what was rejected; it simply stops holding the collection hostage.
+    */
+    const refused = pendingFor(moduleName).filter((row) => row.kind === "refused");
+    if (refused.length) {
+      console.warn(
+        `PPMChildDatabase: ${refused.length} "${moduleName}" change(s) were refused by the database and cannot be ` +
+          `retried. Refreshing anyway - the database copy is the real one. Run ` +
+          `PPMChildDatabase.pendingWrites("${moduleName}") to see what was rejected, then ` +
+          `PPMChildDatabase.clearPending("${moduleName}") once you have noted it.`
+      );
+    }
+
+    const stillBlocking = pendingFor(moduleName).filter(
+      (row) => row.kind !== "conflict" && row.kind !== "refused"
+    );
     if (stillBlocking.length && !options?.force) {
       console.warn(
         `PPMChildDatabase: not refreshing "${moduleName}" from the database - ${stillBlocking.length} unsaved change(s) are pending. ` +
