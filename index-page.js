@@ -147,8 +147,14 @@ function getProjects() {
     }
   }
 
-  localStorage.setItem("ppmProjects", JSON.stringify(initialProjects));
+  /*
+    Stage 16: the seed is returned, not written.
 
+    This used to persist a hard-coded demo portfolio whenever storage was empty. That predates
+    the database, and is now actively wrong: hydration fills storage before any page script
+    runs, so an empty read means the portfolio is genuinely empty or hydration was refused -
+    and in either case inventing projects and saving them is the last thing to do.
+  */
   return window.PPMAdmin
     ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(initialProjects)
     : [...initialProjects];
@@ -174,8 +180,12 @@ function getProjectPlans() {
   return {};
 }
 
-function saveProjects() {
-  localStorage.setItem("ppmProjects", JSON.stringify(projects));
+/* Stage 16: the one write seam. Callers must look at what comes back. */
+async function saveProjects() {
+  if (!window.PPMStore) {
+    return { ok: false, reason: "failed", message: "The data layer is not loaded on this page.", queued: false };
+  }
+  return window.PPMStore.projects.replaceAll(projects);
 }
 
 const escapeHtml = PPMCore.escapeHtml;
@@ -510,7 +520,18 @@ function clearPerson(project, property) {
   project[`${property}Email`] = "";
 }
 
-function duplicateProject(event) {
+async /*
+  Stage 16: one unwrapper for the writes on this page, so each call site stays readable and
+  none of them can quietly skip the check.
+*/
+async function savedCopy(promise) {
+  const result = await promise;
+  if (!result || result.ok !== false) return true;
+  showSuccessMessage(result.message);
+  return false;
+}
+
+async function duplicateProject(event) {
   event.preventDefault();
   const sourceCode = document.getElementById("duplicateSourceCode").value;
   const source = projects.find((project) => project.projectCode === sourceCode);
@@ -632,7 +653,7 @@ function duplicateProject(event) {
     });
   }
   projects.push(duplicated);
-  saveProjects();
+  await saveProjects();
 
 
   if (document.getElementById("copyPlan").checked) {
@@ -649,7 +670,7 @@ function duplicateProject(event) {
       createdAt: now,
       updatedAt: now
     }));
-    localStorage.setItem("ppmProjectPlans", JSON.stringify(plans));
+    if (!(await savedCopy(window.PPMStore.plans.replaceAll(plans)))) return;
   }
   if (document.getElementById("copyMilestones").checked) {
     const milestones = readObjectStore("ppmProjectMilestones");
@@ -664,7 +685,7 @@ function duplicateProject(event) {
       createdAt: now,
       updatedAt: now
     }));
-    localStorage.setItem("ppmProjectMilestones", JSON.stringify(milestones));
+    if (!(await savedCopy(window.PPMStore.milestones.replaceAll(milestones)))) return;
   }
   if (document.getElementById("copyOpenRaid").checked) {
     const raid = readObjectStore("ppmProjectRaid");
@@ -682,7 +703,7 @@ function duplicateProject(event) {
         createdAt: now,
         updatedAt: now
       }));
-    localStorage.setItem("ppmProjectRaid", JSON.stringify(raid));
+    if (!(await savedCopy(window.PPMStore.raid.replaceAll(raid)))) return;
   }
   closeDuplicateModal();
   document.getElementById("statusFilter").value = "";
@@ -712,7 +733,7 @@ function openArchiveModal(projectCode, action) {
   document.getElementById("archiveReason").focus();
 }
 
-function saveArchiveAction(event) {
+async function saveArchiveAction(event) {
   event.preventDefault();
   const code = document.getElementById("archiveProjectCode").value;
   const action = document.getElementById("archiveAction").value;
@@ -732,7 +753,7 @@ function saveArchiveAction(event) {
     action === "reopen"
       ? PPMGovernance.reopenProject(projects[index], reason)
       : PPMGovernance.archiveProject(projects[index], reason);
-  saveProjects();
+  await saveProjects();
 
   closeArchiveModal();
   document.getElementById("statusFilter").value = action === "reopen" ? "" : "Archived";

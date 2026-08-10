@@ -40,7 +40,7 @@ function getMilestoneStore() {
 
 // Formal lifecycle gates are governed on stage-gates.html. Any legacy row that was
 // typed "Stage Gate" here becomes a plain delivery milestone, keeping all other values.
-function migrateLegacyStageGateRows() {
+async function migrateLegacyStageGateRows() {
   const store = getMilestoneStore();
   let changed = 0;
   Object.values(store).forEach((rows) => {
@@ -52,15 +52,23 @@ function migrateLegacyStageGateRows() {
       }
     });
   });
-  if (changed) localStorage.setItem("ppmProjectMilestones", JSON.stringify(store));
+  /* Stage 16: awaited, and the count is only reported once the database has it. */
+  if (!changed) return 0;
+  const saved = await window.PPMStore?.milestones.replaceAll(store);
+  if (saved && saved.ok === false) throw new Error(saved.message);
   return changed;
 }
 
-function saveMilestones() {
+async function saveMilestones() {
   if (projectArchived) return false;
   const store = getMilestoneStore();
   store[projectCode] = projectMilestones;
-  localStorage.setItem("ppmProjectMilestones", JSON.stringify(store));
+  if (!window.PPMStore) return false;
+  const saved = await window.PPMStore.milestones.replaceAll(store);
+  if (saved && saved.ok === false) {
+    showMessage(saved.message, "error");
+    return false;
+  }
   return true;
 }
 
@@ -223,7 +231,7 @@ function applyArchivedMilestoneMode() {
   );
 }
 
-function refreshCalculatedStatuses() {
+async function refreshCalculatedStatuses() {
   let changed = false;
   projectMilestones.forEach((milestone) => {
     const status = calculateStatus(milestone);
@@ -233,7 +241,7 @@ function refreshCalculatedStatuses() {
       changed = true;
     }
   });
-  if (changed && !projectArchived) saveMilestones();
+  if (changed && !projectArchived) await saveMilestones();
 }
 
 function filteredMilestones() {
@@ -513,14 +521,14 @@ function validateInlineMilestones() {
   return true;
 }
 
-function saveInlineMilestones() {
+async function saveInlineMilestones() {
   if (projectArchived) {
     applyArchivedMilestoneMode();
     return;
   }
   if (!hasUnsavedMilestoneChanges || !project) return;
   if (!validateInlineMilestones()) return;
-  saveMilestones();
+  await saveMilestones();
   // Records created, updated and deleted rows in one pass, cell by cell.
   PPMChangeLog.trackCollection({
     before: originalMilestones,
@@ -542,7 +550,7 @@ function saveInlineMilestones() {
   showMessage("Milestone changes were saved.", "success");
 }
 
-function saveMilestone(event) {
+async function saveMilestone(event) {
   event.preventDefault();
   if (projectArchived) {
     closeMilestoneModal();
@@ -591,7 +599,7 @@ function saveMilestone(event) {
     showMessage(`${milestone.milestoneName} was added.`, "success");
   }
 
-  saveMilestones();
+  await saveMilestones();
   const savedMilestone = projectMilestones.find((item) => item.milestoneId === milestone.milestoneId);
   PPMChangeLog.recordRow({
     before: beforeAudit,
@@ -711,15 +719,15 @@ window.addEventListener("beforeunload", (event) => {
 
 async function initialiseMilestonesPage() {
   if (window.PPMChildDatabase?.ready) await PPMChildDatabase.ready;
-  migrateLegacyStageGateRows();
+  await migrateLegacyStageGateRows();
   projects = getProjects();
   populateProjectSelector();
   loadSelectedProject();
 }
 
-initialiseMilestonesPage().catch((error) => {
+initialiseMilestonesPage().catch(async (error) => {
   console.error("Milestones: database hydration did not complete cleanly; using the local copy.", error);
-  migrateLegacyStageGateRows();
+  await migrateLegacyStageGateRows();
   projects = getProjects();
   populateProjectSelector();
   loadSelectedProject();

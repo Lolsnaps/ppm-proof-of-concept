@@ -125,12 +125,15 @@ function getProjectRaidItems(selectedProjectCode) {
     );
 }
 
-function saveProjectDocuments() {
+async function saveProjectDocuments() {
   const allDocuments = getAllProjectDocuments();
 
   allDocuments[projectCode] = projectDocuments;
 
-  localStorage.setItem("ppmProjectDocuments", JSON.stringify(allDocuments));
+  if (!window.PPMStore) {
+    return { ok: false, reason: "failed", message: "The data layer is not loaded on this page.", queued: false };
+  }
+  return window.PPMStore.documents.replaceAll(allDocuments);
 }
 
 function showMessage(text, type) {
@@ -865,9 +868,13 @@ function startEditing(formName) {
   already loaded. That is what preserves `databaseVersion`, and with it optimistic locking:
   re-reading the record here would defeat the protection it exists to give.
 
-  The write goes through localStorage.setItem, which both adapters patch, so it reaches
-  PostgreSQL. The audit trail is written by database triggers from the authenticated
-  identity, so there is nothing to record from here.
+  Stage 16: the write goes through PPMStore and is awaited, so a refusal is shown rather than
+  swallowed. It used to be localStorage.setItem, which reached PostgreSQL only because both
+  adapters patched it - and returned before the database had been asked anything, so this page
+  could report a saved project the database had rejected.
+
+  The audit trail is written by database triggers from the authenticated identity, so there is
+  nothing to record from here.
 */
 async function saveEditor() {
   if (!openEditorForm || !project) return;
@@ -897,11 +904,16 @@ async function saveEditor() {
     String(item.projectCode).toLowerCase() === String(updated.projectCode).toLowerCase() ? updated : item
   );
 
-  try {
-    localStorage.setItem("ppmProjects", JSON.stringify(projects));
-  } catch (error) {
-    console.error("The project could not be saved.", error);
-    showMessage("The project could not be saved, so nothing has been changed.", "error");
+  const savedProject = await window.PPMStore?.projects.replaceAll(projects);
+  if (!savedProject || savedProject.ok === false) {
+    const message = savedProject?.message || "The data layer is not loaded on this page.";
+    console.error("The project could not be saved.", message);
+    showMessage(
+      savedProject?.queued
+        ? `${message} It is saved on this computer and will be retried.`
+        : `The project could not be saved, so nothing has been changed. ${message}`,
+      savedProject?.queued ? "warning" : "error"
+    );
     return;
   }
 
@@ -1410,7 +1422,7 @@ function currentProjectCode() {
   return new URLSearchParams(location.search).get("code") || "";
 }
 
-function saveDocument(event) {
+async function saveDocument(event) {
   event.preventDefault();
 
   if (projectIsArchived()) {
@@ -1500,7 +1512,7 @@ function saveDocument(event) {
     showMessage(`${documentLink.name} was added.`, "success");
   }
 
-  saveProjectDocuments();
+  await saveProjectDocuments();
   closeDocumentModal();
   renderDocuments();
 }
@@ -1534,7 +1546,7 @@ function closeDeleteDocumentConfirmation() {
   document.body.style.overflow = "";
 }
 
-function confirmDeleteDocument() {
+async function confirmDeleteDocument() {
   const documentLink = projectDocuments.find((item) => item.documentId === pendingDeleteDocumentId);
   if (!documentLink) {
     closeDeleteDocumentConfirmation();
@@ -1551,7 +1563,7 @@ function confirmDeleteDocument() {
     name: removedDocument.name
   });
   closeDeleteDocumentConfirmation();
-  saveProjectDocuments();
+  await saveProjectDocuments();
   renderDocuments();
   showMessage(`${documentLink.name} was removed.`, "success");
 }

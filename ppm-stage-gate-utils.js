@@ -45,14 +45,37 @@
     return parseJson(localStorage.getItem(key), fallback);
   }
 
-  function rawWrite(key, value) {
+  /*
+    Stage 16: two modes, and the difference matters.
+
+    INSIDE A WORKFLOW CAPTURE this writes nothing. It collects the intended state so
+    runTransactionalWorkflow can send the whole set to the transactional function, which commits
+    it as one transaction. That branch runs before any await, so although this is an async
+    function the capture is complete the moment it is called - a caller inside the capture can
+    ignore the returned promise, and transitionLocal and its siblings do.
+
+    OUTSIDE A CAPTURE - drafting a gate, deleting a draft - it is an ordinary write and goes
+    through the one seam like everything else. It used to go through PPMAuth.writeScoped into
+    the patched localStorage, which returned before the database had been asked anything.
+  */
+  async function rawWrite(key, value) {
     if (workflowCapture) {
       workflowCapture.stores.set(key, clone(value));
-      return value;
+      return { ok: true, captured: true, value };
     }
-    if (window.PPMAuth?.writeScoped) window.PPMAuth.writeScoped(key, value);
-    else localStorage.setItem(key, JSON.stringify(value));
-    return value;
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so nothing was saved.",
+        queued: false
+      };
+    }
+    const collection = window.PPMStore.collectionFor(key);
+    if (!collection) {
+      return { ok: false, reason: "invalid", message: `No collection is registered for "${key}".`, queued: false };
+    }
+    return window.PPMStore.replaceAll(collection, value);
   }
 
   function today() {
@@ -695,7 +718,7 @@
     }, []);
   }
 
-  function writeGate(gate, oldProjectCode) {
+  async function writeGate(gate, oldProjectCode) {
     const store = readStoreRaw();
     const removeFrom = clean(oldProjectCode || gate.projectCode);
     if (store[removeFrom])
@@ -704,7 +727,7 @@
     rawWrite(STORAGE_KEY, store);
   }
 
-  function save(gateSource) {
+  async function save(gateSource) {
     const incoming = normaliseGate(gateSource);
     const existing = findRaw(incoming.gateId);
     const project = findProject(incoming.projectCode);
@@ -786,12 +809,13 @@
         gate.routeRequestedAt = existing.routeRequestedAt;
       }
     }
-    writeGate(gate, existing?.projectCode);
+    const written = await writeGate(gate, existing?.projectCode);
+    if (written && written.ok === false) throw new Error(written.message);
     dispatchChange("saved", gate);
     return clone(gate);
   }
 
-  function deleteGate(gateId, projectCode) {
+  async function deleteGate(gateId, projectCode) {
     const existing = findRaw(gateId, projectCode);
     if (!existing) return false;
     if (!canEdit(existing.projectCode))
@@ -813,7 +837,12 @@
       (gate) => gate.gateId !== existing.gateId
     );
     if (!store[existing.projectCode].length) delete store[existing.projectCode];
-    rawWrite(STORAGE_KEY, store);
+
+    /* Awaited: the gate is only reported deleted, and the change only announced, once the
+       database has accepted it. */
+    const removed = await rawWrite(STORAGE_KEY, store);
+    if (removed && removed.ok === false) throw new Error(removed.message);
+
     dispatchChange("deleted", existing);
     return true;
   }

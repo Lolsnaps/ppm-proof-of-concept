@@ -322,10 +322,11 @@ function addGate() {
     setMessage(error.message, "error");
   }
 }
-function saveOne(id) {
+async function saveOne(id) {
   const gate = gateFor(id);
   if (!gate) return null;
-  const saved = PPMStageGates.save(gate);
+  /* Stage 16: awaited. Nothing below runs unless the database accepted the gate. */
+  const saved = await PPMStageGates.save(gate);
   const index = gates.findIndex((item) => item.gateId === id);
   gates[index] = saved;
   dirtyIds.delete(id);
@@ -346,10 +347,10 @@ function saveChanges() {
     renderTable();
   }
 }
-function persistActiveDetails() {
+async function persistActiveDetails() {
   if (!activeGateId) return null;
   applyDetails(false);
-  return dirtyIds.has(activeGateId) ? saveOne(activeGateId) : gateFor(activeGateId);
+  return dirtyIds.has(activeGateId) ? await saveOne(activeGateId) : gateFor(activeGateId);
 }
 function renderSummary() {
   const rows = filteredGates(),
@@ -679,9 +680,12 @@ function workflowNeedsReason(item) {
     (item.type === "route" && item.value === "Rejected")
   );
 }
-function openWorkflow(item) {
+async function openWorkflow(item) {
   try {
-    persistActiveDetails();
+    /* Awaited: a gate with unsaved detail changes must reach the database before the workflow
+       is opened against it, or the transaction would be built from a state the database has
+       not accepted. */
+    await persistActiveDetails();
   } catch (error) {
     setMessage(error.message, "error");
     return;
@@ -779,12 +783,12 @@ function closeDelete() {
   pendingDeleteId = "";
   document.getElementById("deleteDialog").classList.remove("visible");
 }
-function confirmDelete() {
+async function confirmDelete() {
   if (!pendingDeleteId) return;
   const id = pendingDeleteId,
     gate = gateFor(id);
   try {
-    if (PPMStageGates.find(id)) PPMStageGates.delete(id, gate.projectCode);
+    if (PPMStageGates.find(id)) await PPMStageGates.delete(id, gate.projectCode);
     gates = gates.filter((item) => item.gateId !== id);
     dirtyIds.delete(id);
     closeDelete();

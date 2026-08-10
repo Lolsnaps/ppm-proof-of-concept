@@ -336,7 +336,7 @@
       : [];
   }
 
-  function writeRecords(type, records) {
+  async function writeRecords(type, records) {
     const schema = REGISTER_SCHEMAS[type];
     const store = {};
     records.forEach((source) => {
@@ -349,7 +349,32 @@
       if (!Array.isArray(store[storageGroup])) store[storageGroup] = [];
       store[storageGroup].push(record);
     });
-    localStorage.setItem(schema.storageKey, JSON.stringify(store));
+    /*
+      Stage 16: the one write seam.
+
+      The store this builds is keyed by project code - or by "programme:<id>" for a benefit that
+      belongs to a programme rather than a project - and replaceAll writes it from the
+      collection's own registered shape, so the grouping above stays the single definition of
+      where a record belongs.
+    */
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so nothing was saved.",
+        queued: false
+      };
+    }
+    const collection = window.PPMStore.collectionFor(schema.storageKey);
+    if (!collection) {
+      return {
+        ok: false,
+        reason: "invalid",
+        message: `No collection is registered for "${schema.storageKey}".`,
+        queued: false
+      };
+    }
+    return window.PPMStore.replaceAll(collection, store);
   }
 
   function generateId(type, records) {

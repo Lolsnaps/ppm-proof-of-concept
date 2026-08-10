@@ -386,7 +386,21 @@ function readValue(fieldId) {
   return document.getElementById(fieldId).value.trim();
 }
 
-function syncResourceReferences(resource) {
+async /*
+  Stage 16: one unwrapper for the writes on this page, so each call site stays readable and
+  none of them can quietly skip the check.
+*/
+async function savedReference(promise) {
+  const result = await promise;
+  if (!result || result.ok !== false) return true;
+  showMessage(
+    result.queued ? `${result.message} It is saved on this computer and will be retried.` : result.message,
+    result.queued ? "warning" : "error"
+  );
+  return false;
+}
+
+async function syncResourceReferences(resource) {
   const projectFields = ["projectManager", "sponsor", "projectLead"];
   const projects = JSON.parse(localStorage.getItem("ppmProjects") || "[]");
   let projectsChanged = false;
@@ -400,7 +414,7 @@ function syncResourceReferences(resource) {
         }
       })
     );
-    if (projectsChanged) localStorage.setItem("ppmProjects", JSON.stringify(projects));
+    if (projectsChanged && !(await savedReference(window.PPMStore.projects.replaceAll(projects)))) return false;
   }
 
   const plans = JSON.parse(localStorage.getItem("ppmProjectPlans") || "{}");
@@ -416,7 +430,7 @@ function syncResourceReferences(resource) {
           plansChanged = true;
         }
       });
-    if (plansChanged) localStorage.setItem("ppmProjectPlans", JSON.stringify(plans));
+    if (plansChanged && !(await savedReference(window.PPMStore.plans.replaceAll(plans)))) return false;
   }
 
   const raid = JSON.parse(localStorage.getItem("ppmProjectRaid") || "{}");
@@ -439,7 +453,8 @@ function syncResourceReferences(resource) {
       }
     });
   });
-  if (raidChanged) localStorage.setItem("ppmProjectRaid", JSON.stringify(raid));
+  if (raidChanged && !(await savedReference(window.PPMStore.raid.replaceAll(raid)))) return false;
+  return true;
 }
 
 // Cells tracked in the resource change history.
@@ -627,7 +642,7 @@ async function saveResource(event) {
     statusField: "accountStatus",
     name: resource.fullName
   });
-  syncResourceReferences(resource);
+  await syncResourceReferences(resource);
   closeModal();
   populateTeamFilter();
   renderResources();

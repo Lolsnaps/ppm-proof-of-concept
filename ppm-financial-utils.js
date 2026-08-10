@@ -20,8 +20,30 @@
 
   const readJson = (key, fallback) => PPMCore.readJson(key, fallback);
 
-  function writeJson(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+  /*
+    Stage 16: the one write seam. Was localStorage.setItem, which reached PostgreSQL only via the
+    patched prototype and returned before the database had been asked anything.
+
+    Financial entries and approval requests are objects keyed by project code rather than arrays.
+    replaceAll works from the collection's own registered shape, so this does not need to know
+    that, and cannot get it wrong.
+  */
+  async function writeJson(key, value) {
+    if (!window.PPMStore) {
+      return {
+        ok: false,
+        reason: "failed",
+        message: "The data layer is not loaded on this page, so nothing was saved.",
+        queued: false,
+        value
+      };
+    }
+    const collection = window.PPMStore.collectionFor(key);
+    if (!collection) {
+      return { ok: false, reason: "invalid", message: `No collection is registered for "${key}".`, queued: false, value };
+    }
+    const result = await window.PPMStore.replaceAll(collection, value);
+    return { ...result, value };
   }
   const numeric = PPMCore.numeric;
   function round(value) {
@@ -50,19 +72,31 @@
     }, {});
   }
 
+  /*
+    Stage 16: derives, never writes.
+
+    It used to persist the default categories on first read and again whenever a default was
+    missing - a getter that writes, and one that would have had to become asynchronous, taking
+    its callers with it. backfillCategories() below is the write half, called once.
+  */
   function getCategories() {
     const stored = readJson(KEYS.categories, []);
-    if (!Array.isArray(stored) || !stored.length) {
-      writeJson(KEYS.categories, DEFAULT_CATEGORIES);
-      return DEFAULT_CATEGORIES.map((item) => ({ ...item }));
-    }
+    if (!Array.isArray(stored) || !stored.length) return DEFAULT_CATEGORIES.map((item) => ({ ...item }));
     const names = new Set(stored.map((item) => String(item.name || "").toLowerCase()));
-    const merged = [...stored, ...DEFAULT_CATEGORIES.filter((item) => !names.has(item.name.toLowerCase()))];
-    if (merged.length !== stored.length) writeJson(KEYS.categories, merged);
-    return merged;
+    return [...stored, ...DEFAULT_CATEGORIES.filter((item) => !names.has(item.name.toLowerCase()))];
   }
 
-  function saveCategories(categories) {
+  /* The write half: make the derived defaults permanent. Call it once, where it matters. */
+  async function backfillCategories() {
+    const stored = readJson(KEYS.categories, []);
+    const derived = getCategories();
+    if (Array.isArray(stored) && stored.length === derived.length) {
+      return { ok: true, saved: 0, nothingToDo: true };
+    }
+    return writeJson(KEYS.categories, derived);
+  }
+
+  async function saveCategories(categories) {
     const rows = (Array.isArray(categories) ? categories : [])
       .map((category) => ({
         categoryId: category.categoryId || uid("CAT"),
@@ -72,7 +106,7 @@
         system: Boolean(category.system)
       }))
       .filter((category) => category.name);
-    writeJson(KEYS.categories, rows);
+    return writeJson(KEYS.categories, rows);
     return rows;
   }
 
@@ -82,7 +116,7 @@
     );
   }
 
-  function saveEntries(projectCode, entries) {
+  async function saveEntries(projectCode, entries) {
     const all = flatten(readJson(KEYS.entries, {})).filter((row) => row.projectCode !== projectCode);
     const now = new Date().toISOString();
     const rows = (Array.isArray(entries) ? entries : []).map((row) => ({
@@ -102,7 +136,7 @@
       createdAt: row.createdAt || now,
       updatedAt: now
     }));
-    writeJson(KEYS.entries, group([...all, ...rows]));
+    return writeJson(KEYS.entries, group([...all, ...rows]));
     return rows;
   }
 
@@ -146,10 +180,10 @@
     return getSummaries().find((row) => row.projectCode === projectCode) || null;
   }
 
-  function saveSummary(summary) {
+  async function saveSummary(summary) {
     const rows = getSummaries().filter((row) => row.projectCode !== summary.projectCode);
     rows.push(summary);
-    writeJson(KEYS.summaries, group(rows));
+    return writeJson(KEYS.summaries, group(rows));
     return summary;
   }
 
@@ -161,7 +195,7 @@
     return "Green";
   }
 
-  function syncSummary(projectCode, metadata) {
+  async function syncSummary(projectCode, metadata) {
     const existing = getSummary(projectCode) || {};
     const totals = calculations(getEntries(projectCode), existing.approvedBudget);
     const now = new Date().toISOString();
@@ -199,8 +233,8 @@
     );
   }
 
-  function saveApprovals(rows) {
-    writeJson(KEYS.approvals, group(rows));
+  async function saveApprovals(rows) {
+    return writeJson(KEYS.approvals, group(rows));
   }
 
   function databaseFinancialWorkflowEnabled() {
@@ -208,7 +242,7 @@
     return Boolean(window.PPMChildDatabase?.workflowReady?.("financial"));
   }
 
-  function requestApproval(projectCode, request) {
+  async function requestApproval(projectCode, request) {
     if (databaseFinancialWorkflowEnabled())
       throw new Error("Budget approval requests must be submitted through the Stage 11C database workflow.");
     const approvals = getApprovals();
@@ -273,7 +307,7 @@
     return approval;
   }
 
-  function decideApproval(approvalId, decision) {
+  async function decideApproval(approvalId, decision) {
     if (databaseFinancialWorkflowEnabled())
       throw new Error("Budget approval decisions must be recorded through the Stage 11C database workflow.");
     const approvals = getApprovals();
@@ -335,6 +369,7 @@
     readJson,
     getCategories,
     saveCategories,
+    backfillCategories,
     getEntries,
     saveEntries,
     calculations,

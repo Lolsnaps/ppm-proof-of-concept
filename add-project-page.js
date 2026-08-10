@@ -282,15 +282,25 @@ function getProjects() {
     }
   }
 
-  localStorage.setItem("ppmProjects", JSON.stringify(initialProjects));
+  /*
+    Stage 16: the seed is returned, not written.
 
+    This used to persist a hard-coded demo portfolio whenever storage was empty. That predates
+    the database, and is now actively wrong: hydration fills storage before any page script
+    runs, so an empty read means the portfolio is genuinely empty or hydration was refused -
+    and in either case inventing projects and saving them is the last thing to do.
+  */
   return window.PPMAdmin
     ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(initialProjects)
     : [...initialProjects];
 }
 
-function saveProjects(projects) {
-  localStorage.setItem("ppmProjects", JSON.stringify(projects));
+/* Stage 16: the one write seam. Callers must look at what comes back. */
+async function saveProjects(projects) {
+  if (!window.PPMStore) {
+    return { ok: false, reason: "failed", message: "The data layer is not loaded on this page.", queued: false };
+  }
+  return window.PPMStore.projects.replaceAll(projects);
 }
 
 const projectPeopleFields = [
@@ -1525,7 +1535,11 @@ async function saveProject(event) {
 
     savedProject = projects[projectIndex];
 
-    saveProjects(projects);
+    const savedResult = await saveProjects(projects);
+    if (savedResult && savedResult.ok === false) {
+      showMessage(savedResult.message, "error");
+      return;
+    }
 
     sessionStorage.setItem(
       "ppmSuccessMessage",
@@ -1552,7 +1566,7 @@ async function saveProject(event) {
 
     projects.push(newProject);
     savedProject = newProject;
-    saveProjects(projects);
+    await saveProjects(projects);
 
     sessionStorage.setItem("ppmSuccessMessage", `${newProject.projectName} was added successfully.`);
   }

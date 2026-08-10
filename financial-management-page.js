@@ -328,7 +328,7 @@ function validate() {
   }
   return true;
 }
-function saveChanges() {
+async function saveChanges() {
   if (!PPMAuth.can("financials.edit", projectCode())) {
     PPMAuth.permissionToast();
     return;
@@ -338,9 +338,17 @@ function saveChanges() {
     before = new Map(originalEntries),
     now = new Date().toISOString(),
     owner = PPMResources.getSelectedPerson(el("financialOwner"));
-  entries = PPMFinancial.saveEntries(code, entries);
+  /* Stage 16: awaited, and nothing below runs unless the database accepted the entries -
+     including the summary, which is derived from them. */
+  const entriesResult = await PPMFinancial.saveEntries(code, entries);
+  if (entriesResult && entriesResult.ok === false) {
+    showMessage(entriesResult.message, "error");
+    return;
+  }
+  entries = entriesResult.value ?? entries;
+
   const summaryBefore = currentSummary();
-  const summary = PPMFinancial.syncSummary(code, {
+  const summaryResult = await PPMFinancial.syncSummary(code, {
     financialOwner: owner.name,
     financialOwnerResourceId: owner.resourceId,
     financialOwnerEmail: owner.email,
@@ -348,6 +356,11 @@ function saveChanges() {
     financialRag: el("financialRag").value,
     financialCommentary: el("financialCommentary").value
   });
+  if (summaryResult && summaryResult.ok === false) {
+    showMessage(summaryResult.message, "error");
+    return;
+  }
+  const summary = summaryResult.value ?? summaryResult;
   /* Stage 14: the loops that used to walk changed and deleted entries here existed
      only to emit browser-side audit records. The database records every insert,
      update and soft delete from the authenticated identity, so they are gone. */
@@ -382,7 +395,7 @@ function addCategory() {
   container.appendChild(row);
   row.querySelector("input").focus();
 }
-function saveCategories() {
+async function saveCategories() {
   if (!PPMAuth.can("financials.configure")) {
     PPMAuth.permissionToast();
     return;
@@ -404,7 +417,11 @@ function saveCategories() {
     showMessage("Financial category names must be unique.", "error");
     return;
   }
-  PPMFinancial.saveCategories(rows);
+  const categoryResult = await PPMFinancial.saveCategories(rows);
+  if (categoryResult && categoryResult.ok === false) {
+    showMessage(categoryResult.message, "error");
+    return;
+  }
 
   closeModal("categoryModal");
   renderTable();
@@ -500,7 +517,7 @@ async function submitApproval(event) {
 
       }
     } else {
-      PPMFinancial.requestApproval(projectCode(), {
+      await PPMFinancial.requestApproval(projectCode(), {
         requesterResourceId: requester.resourceId,
         requesterName: requester.name,
         requesterEmail: requester.email,
@@ -589,7 +606,7 @@ async function decide(status) {
 
       }
     } else {
-      PPMFinancial.decideApproval(activeDecisionId, {
+      await PPMFinancial.decideApproval(activeDecisionId, {
         status,
         decisionByResourceId: signedIn.resourceId,
         decisionByName: signedIn.fullName,
@@ -669,3 +686,16 @@ addEventListener("beforeunload", (event) => {
   event.returnValue = "";
 });
 initialise();
+
+/*
+  Stage 16: the default financial categories are now persisted here, once, rather than as a side
+  effect of every getCategories() call. Failure is reported instead of swallowed - previously the
+  write happened silently on whichever page read categories first, so nobody could have known if
+  it had not worked.
+*/
+PPMFinancial.backfillCategories()
+  .then((result) => {
+    if (result.nothingToDo || result.ok) return;
+    showMessage(`Default financial categories could not be saved: ${result.message}`, "error");
+  })
+  .catch((error) => console.error("The financial category backfill failed.", error));

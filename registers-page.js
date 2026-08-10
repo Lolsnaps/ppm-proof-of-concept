@@ -389,7 +389,7 @@ function validate() {
   }
   return true;
 }
-function saveChanges() {
+async function saveChanges() {
   if (!hasUnsavedChanges) return;
   if (!validate()) return;
   const now = new Date().toISOString();
@@ -404,7 +404,13 @@ function saveChanges() {
     }
     return prepared;
   });
-  PPMRegisters.writeRecords(activeType, records);
+  /* Stage 16: awaited, and the page only reloads and reports success if it landed. */
+  const saved = await PPMRegisters.writeRecords(activeType, records);
+  if (saved && saved.ok === false) {
+    setMessage(saved.message, "error");
+    return;
+  }
+
   /* Stage 14: browser-side audit emission removed. The database records register
      inserts, updates and status movements from the authenticated identity. */
   loadRecords();

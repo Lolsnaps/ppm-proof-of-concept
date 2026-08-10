@@ -432,7 +432,7 @@ function validate() {
   }
   return true;
 }
-function saveChanges() {
+async function saveChanges() {
   if (!hasUnsavedChanges || !validate()) return;
   const now = new Date().toISOString();
   benefits = benefits.map((record) => {
@@ -441,7 +441,14 @@ function saveChanges() {
     prepared.lastReviewDate = prepared.lastReviewDate || "";
     return prepared;
   });
-  PPMRegisters.writeRecords("benefits", benefits);
+  /* Stage 16: awaited. The audit entries below describe changes that have been made, so a
+     refused save must stop before they are recorded. */
+  const saved = await PPMRegisters.writeRecords("benefits", benefits);
+  if (saved && saved.ok === false) {
+    setMessage(saved.message, "error");
+    return;
+  }
+
   PPMChangeLog.trackCollection({
     before: originalBenefits,
     after: benefits,
