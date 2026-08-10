@@ -386,7 +386,7 @@ function readValue(fieldId) {
   return document.getElementById(fieldId).value.trim();
 }
 
-async /*
+/*
   Stage 16: one unwrapper for the writes on this page, so each call site stays readable and
   none of them can quietly skip the check.
 */
