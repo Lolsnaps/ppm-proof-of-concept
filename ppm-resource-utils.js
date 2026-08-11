@@ -111,7 +111,7 @@
           <div id="ppmQuickPersonMessage" class="ppm-quick-person-message" role="alert"></div>
           <div class="ppm-quick-person-footer">
             <button id="ppmQuickPersonCancel" type="button" class="ppm-quick-person-button secondary">Cancel</button>
-            <button type="submit" class="ppm-quick-person-button">Create and select</button>
+            <button type="submit" class="ppm-quick-person-button" data-permission="resources.edit">Create and select</button>
           </div>
         </form>
       </div>

@@ -1140,11 +1140,11 @@
     <section class="ppm-notification-panel" role="dialog" aria-label="Notifications" hidden>
       <div class="ppm-notification-panel-head"><div><h2>Notifications</h2><p class="ppm-notification-summary">0 unread · 0 total</p></div><button class="ppm-notification-close" type="button" aria-label="Close notifications">×</button></div>
       <div class="ppm-notification-tools"><div class="ppm-notification-filters" role="group" aria-label="Filter notifications">
-        <button type="button" class="active" data-notification-filter="all" aria-pressed="true">All <span>0</span></button>
-        <button type="button" data-notification-filter="approval" aria-pressed="false">Approvals <span>0</span></button>
-        <button type="button" data-notification-filter="due" aria-pressed="false">Due <span>0</span></button>
-        <button type="button" data-notification-filter="update" aria-pressed="false">Updates <span>0</span></button>
-      </div><button class="ppm-notification-mark-all" type="button">Mark all read</button></div>
+        <button type="button" class="active" data-permission="none" data-notification-filter="all" aria-pressed="true">All <span>0</span></button>
+        <button type="button" data-permission="none" data-notification-filter="approval" aria-pressed="false">Approvals <span>0</span></button>
+        <button type="button" data-permission="none" data-notification-filter="due" aria-pressed="false">Due <span>0</span></button>
+        <button type="button" data-permission="none" data-notification-filter="update" aria-pressed="false">Updates <span>0</span></button>
+      </div><button class="ppm-notification-mark-all" data-permission="none" type="button">Mark all read</button></div>
       <div class="ppm-notification-list" aria-live="polite"></div>
     </section>`;
     const signOut = sessionBar.querySelector(".ppm-session-button");

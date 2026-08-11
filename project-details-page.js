@@ -1211,6 +1211,7 @@ function renderDocuments() {
             <button
               type="button"
               class="button small edit-document-button"
+              data-permission="projects.edit"
               data-document-id="${escapeHtml(documentLink.documentId)}"
             >
               Edit
@@ -1219,6 +1220,7 @@ function renderDocuments() {
             <button
               type="button"
               class="button small danger delete-document-button"
+              data-permission="projects.edit"
               data-document-id="${escapeHtml(documentLink.documentId)}"
             >
               Delete

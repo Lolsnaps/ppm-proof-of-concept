@@ -707,7 +707,7 @@ function renderDependencyRows() {
               )
               .join(
                 ""
-              )}</select></div><div><label>External project</label><select data-dep-field="externalProjectCode"${d.scope !== "External" ? " disabled" : ""}><option value="">Select project</option>${projectOptions.replace(`value="${d.externalProjectCode}"`, `value="${d.externalProjectCode}" selected`)}</select></div><div><label>Reference type</label><select data-dep-field="externalReferenceType"${d.scope !== "External" ? " disabled" : ""}>${optionMarkup(["Project", "Milestone", "Task"], d.externalReferenceType || "Task")}</select></div><div><label>Linked reference</label><select data-dep-field="externalReference"${d.scope !== "External" ? " disabled" : ""}>${externalItemOptions(d.externalProjectCode, d.externalReferenceType || "Task", d.externalReference)}</select></div><button type="button" class="button danger small" data-remove-dependency="${index}">Remove</button></div>`
+              )}</select></div><div><label>External project</label><select data-dep-field="externalProjectCode"${d.scope !== "External" ? " disabled" : ""}><option value="">Select project</option>${projectOptions.replace(`value="${d.externalProjectCode}"`, `value="${d.externalProjectCode}" selected`)}</select></div><div><label>Reference type</label><select data-dep-field="externalReferenceType"${d.scope !== "External" ? " disabled" : ""}>${optionMarkup(["Project", "Milestone", "Task"], d.externalReferenceType || "Task")}</select></div><div><label>Linked reference</label><select data-dep-field="externalReference"${d.scope !== "External" ? " disabled" : ""}>${externalItemOptions(d.externalProjectCode, d.externalReferenceType || "Task", d.externalReference)}</select></div><button type="button" class="button danger small" data-permission="plan.edit" data-remove-dependency="${index}">Remove</button></div>`
         )
         .join("")
     : "<p>No dependencies have been added.</p>";
@@ -1122,7 +1122,7 @@ function renderBaselineGovernance() {
 <td>${escapeHtml(r.requestedBy || "")}</td>
 <td>${escapeHtml(r.reason || "")}<br>${escapeHtml(r.impact || "")}</td>
 <td><span class="badge ${r.status === "Approved" ? "green" : r.status === "Rejected" ? "red" : "amber"}">${escapeHtml(r.status)}</span></td>
-<td>${r.status === "Requested" && !projectArchived ? `<button class="button small" data-request-action="approve" data-request-id="${r.requestId}">Approve</button> <button class="button danger small" data-request-action="reject" data-request-id="${r.requestId}">Reject</button>` : escapeHtml(r.decisionNotes || "")}</td></tr>`
+<td>${r.status === "Requested" && !projectArchived ? `<button class="button small" data-permission="plan.approveBaseline" data-request-action="approve" data-request-id="${r.requestId}">Approve</button> <button class="button danger small" data-permission="plan.approveBaseline" data-request-action="reject" data-request-id="${r.requestId}">Reject</button>` : escapeHtml(r.decisionNotes || "")}</td></tr>`
         )
         .join("")}</tbody></table>`
     : "<p>No rebaseline requests.</p>";

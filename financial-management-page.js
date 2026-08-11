@@ -119,7 +119,7 @@ function renderTable() {
 <td><input class="description" data-field="description" value="${escapeHtml(row.description)}" placeholder="Cost item description" ${readOnly ? "disabled" : ""}></td>
 <td><input data-field="financialPeriod" type="month" value="${escapeHtml(row.financialPeriod)}" ${readOnly ? "disabled" : ""}></td>${["budgetAmount", "forecastCost", "actualCost", "committedCost"].map((field) => `<td><input class="money-input" data-field="${field}" type="number" min="0" step="0.01" value="${Number(row[field] || 0)}" ${readOnly ? "disabled" : ""}></td>`).join("")}<td><span class="calculated">${PPMFinancial.money(Math.max(Number(row.forecastCost || 0) - Number(row.actualCost || 0), 0))}</span></td>
 <td><input class="notes" data-field="notes" value="${escapeHtml(row.notes)}" placeholder="Supporting note" ${readOnly ? "disabled" : ""}></td>
-<td><div class="row-actions">${PPMChangeLog.historyButton("Financial entry", rowId(row), row.description || rowId(row))}<button class="button danger small delete-row" type="button" ${readOnly ? "disabled" : ""}>Delete</button></div></td></tr>`
+<td><div class="row-actions">${PPMChangeLog.historyButton("Financial entry", rowId(row), row.description || rowId(row))}<button class="button danger small delete-row" data-permission="financials.edit" type="button" ${readOnly ? "disabled" : ""}>Delete</button></div></td></tr>`
     )
     .join("");
   el("emptyState").style.display = entries.length ? "none" : "block";
@@ -226,7 +226,7 @@ function renderHistory() {
 <td>${escapeHtml(row.approverName || row.approverResourceId)}</td>
 <td><span class="status-badge ${row.status === "Approved" ? "approved" : row.status === "Pending Approval" ? "pending" : "rejected"}">${escapeHtml(row.status)}</span></td>
 <td>${row.decisionComments ? `${escapeHtml(row.decisionComments)}<br><span class="muted-note">${row.decisionAt ? new Date(row.decisionAt).toLocaleString("en-GB") : ""}</span>` : "Awaiting decision"}</td>
-<td>${authorised ? `<button class="button small decide-button" data-approval-id="${escapeHtml(row.approvalId)}" type="button">Record decision</button>` : row.status === "Pending Approval" ? '<span class="muted-note">Assigned approver only</span>' : "—"}</td></tr>`;
+<td>${authorised ? `<button class="button small decide-button" data-permission="financials.approve" data-approval-id="${escapeHtml(row.approvalId)}" type="button">Record decision</button>` : row.status === "Pending Approval" ? '<span class="muted-note">Assigned approver only</span>' : "—"}</td></tr>`;
         })
         .join("")}</tbody></table>`
     : '<div class="empty visible">No budget approval requests have been raised for this project.</div>';

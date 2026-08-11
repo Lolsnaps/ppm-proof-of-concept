@@ -948,7 +948,7 @@
 <td>${(scenario.demands || []).length}</td>
 <td>${changes.length}</td>
 <td>${scenario.updatedAt ? new Date(scenario.updatedAt).toLocaleString("en-GB") : "Not recorded"}</td>
-<td><div class="rm-actions"><button type="button" class="button light small rm-compare-scenario" data-scenario-id="${scenario.scenarioId}">Compare</button>${editable ? `<button type="button" class="button light small rm-adjust-scenario" data-scenario-id="${scenario.scenarioId}">Adjust</button><button type="button" class="button small rm-publish-scenario" data-permission="resourceManagement.publishScenario" data-scenario-id="${scenario.scenarioId}">Publish</button><button type="button" class="button danger small rm-reject-scenario" data-scenario-id="${scenario.scenarioId}">Reject</button>` : ""}</div></td></tr>`;
+<td><div class="rm-actions"><button type="button" class="button light small rm-compare-scenario" data-scenario-id="${scenario.scenarioId}">Compare</button>${editable ? `<button type="button" class="button light small rm-adjust-scenario" data-scenario-id="${scenario.scenarioId}">Adjust</button><button type="button" class="button small rm-publish-scenario" data-permission="resourceManagement.publishScenario" data-scenario-id="${scenario.scenarioId}">Publish</button><button type="button" class="button danger small rm-reject-scenario" data-permission="resourceManagement.publishScenario" data-scenario-id="${scenario.scenarioId}">Reject</button>` : ""}</div></td></tr>`;
           })
           .join("")}</tbody></table></div><div id="rmScenarioComparison"></div>`
       : '<div class="rm-empty">No resource scenarios have been created. A scenario is isolated from live demand until it is published.</div>';
