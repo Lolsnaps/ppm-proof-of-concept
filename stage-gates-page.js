@@ -447,12 +447,21 @@ function renderHistory(gate) {
         item.submissionComments ||
         `${item.currentStage || "Not set"} → ${item.proposedNextStage || "No progression"}`
     })),
-    ...gate.decisionHistory.map((item) => ({
-      title: `${item.decision}${item.revision ? ` · v${item.revision}` : ""}`,
-      person: item.actorName,
-      date: item.decidedAt,
-      text: item.comments || item.conditions || item.reason
-    })),
+    ...gate.decisionHistory.map((item) => {
+      /* A decision taken with readiness items outstanding says so, permanently. That is the
+         governance record the old behaviour destroyed by refusing instead. */
+      const outstanding = Array.isArray(item.readinessOutstanding) ? item.readinessOutstanding : [];
+      const note = outstanding.length
+        ? `${outstanding.length} readiness item${outstanding.length === 1 ? "" : "s"} outstanding at the time: ${outstanding.join(", ")}.`
+        : "";
+      const said = item.comments || item.conditions || item.reason || "";
+      return {
+        title: `${item.decision}${item.revision ? ` · v${item.revision}` : ""}`,
+        person: item.actorName,
+        date: item.decidedAt,
+        text: [said, note].filter(Boolean).join(" ")
+      };
+    }),
     ...gate.routeApprovalHistory.map((item) => ({
       title: `Route ${item.decision}`,
       person: item.actorName,
@@ -750,6 +759,28 @@ async function openWorkflow(item) {
       : item.value === "Approved" && item.type !== "route"
         ? "Your approval is retained against your account. The project moves stage only after every required approver gives final approval."
         : `Confirm the ${String(item.value).toLowerCase()} outcome. The project stage will not change unless final approval is complete.`;
+  /*
+    What the readiness rules say is outstanding, shown before the person commits.
+
+    This used to be a refusal: submission and approval both threw when readiness was incomplete.
+    The decision belongs to whoever is making it, so the tool now says what it knows and lets
+    them proceed - and records what was outstanding on the decision itself.
+  */
+  const readinessNote = document.getElementById("workflowReadiness");
+  if (readinessNote) {
+    const gateNow = PPMStageGates.getAll().find((row) => row.gateId === activeGateId);
+    const readiness = gateNow && item.type !== "route" ? PPMStageGates.readinessFor(gateNow) : { outstanding: [] };
+    if (readiness.outstanding.length) {
+      readinessNote.innerHTML =
+        `<b>${readiness.outstanding.length} readiness item${readiness.outstanding.length === 1 ? " is" : "s are"} outstanding.</b> ` +
+        `${escapeHtml(readiness.outstanding.join(", "))}.<br />` +
+        `This does not prevent the action. It will be recorded against your decision.`;
+      readinessNote.hidden = false;
+    } else {
+      readinessNote.textContent = "";
+      readinessNote.hidden = true;
+    }
+  }
   document.getElementById("workflowComments").value = "";
   document.getElementById("workflowConditions").value = "";
   document.getElementById("workflowReason").value = "";

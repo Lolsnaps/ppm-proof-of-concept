@@ -603,9 +603,36 @@
     return entry;
   }
 
+  /*
+    Two different questions, deliberately kept apart.
+
+      errors    the record cannot be written as described - no gate id, a stage that is not in
+                the project's lifecycle, a next stage equal to the current one. These are
+                statements about the data, and they still refuse.
+
+      advice    the organisation's own readiness rules say something is outstanding. These no
+                longer refuse anything.
+
+    WHY READINESS STOPPED BLOCKING
+
+    It was refusing submission and approval on behalf of the people whose judgement the gate
+    exists to record. A stage gate IS the decision - if a sponsor wants to approve with three
+    evidence items outstanding, because they know something the mandatory-field list does not,
+    that is precisely the call they are accountable for. Software that refuses is not enforcing
+    governance; it is substituting a checklist for a decision and leaving the person no way to
+    record that they made one.
+
+    So the rules are still evaluated, still shown, and now carried onto the decision record: an
+    approval made with items outstanding says so, permanently, with the list. That is a better
+    governance artefact than a refusal, because a refusal leaves no trace at all - the person
+    simply fills in whatever unblocks the button.
+
+    The database never enforced readiness. This was only ever a browser rule.
+  */
   function validate(gateSource, mode) {
     const gate = normaliseGate(gateSource);
     const errors = [];
+    const advice = [];
     const project = findProject(gate.projectCode);
     const configuredStages = project ? projectStageOrder(project) : stageOrder();
     if (!gate.gateId) errors.push("Gate ID is required.");
@@ -649,9 +676,15 @@
             (resource.accountStatus !== "Active" || !resourceHasPermission(resource, "stageGates.approve")))
         );
       });
+      /*
+        Stage 18 made being named the authority, and dropped the matching rule from
+        ppm_commit_stage_gate_workflow. This is its browser twin: it now only asks whether the
+        person can actually sign in, because naming somebody who can never open the tool leaves
+        the gate stuck with no way to say so.
+      */
       if (unauthorisedApprover)
         errors.push(
-          `${unauthorisedApprover.name || unauthorisedApprover.resourceId} does not have an active account with stage-gate approval permission.`
+          `${unauthorisedApprover.name || unauthorisedApprover.resourceId} does not have an active account, so could never record a decision.`
         );
       if (
         gate.requiredApprovers.some((approver) =>
@@ -672,17 +705,46 @@
           includeRelated: true
         });
         if (!readiness.valid) {
-          const labels = readiness.missing
-            .slice(0, 8)
-            .map((item) => item.label)
-            .join(", ");
-          const remainder = readiness.missing.length > 8 ? ` and ${readiness.missing.length - 8} more` : "";
-          errors.push(`${gate.proposedNextStage} readiness is incomplete: ${labels}${remainder}.`);
+          advice.push({
+            stage: gate.proposedNextStage,
+            outstanding: readiness.missing.map((item) => item.label),
+            summary: readinessSentence(gate.proposedNextStage, readiness.missing)
+          });
         }
       }
     }
     if (project && isArchived(project)) errors.push("Archived projects are read-only.");
-    return { valid: errors.length === 0, errors, gate };
+    return { valid: errors.length === 0, errors, advice, gate };
+  }
+
+  /* One sentence naming what is outstanding, for a dialogue and for the decision record. */
+  function readinessSentence(stage, missing) {
+    const rows = Array.isArray(missing) ? missing : [];
+    if (!rows.length) return "";
+    const labels = rows.slice(0, 8).map((item) => item.label || item).join(", ");
+    const remainder = rows.length > 8 ? ` and ${rows.length - 8} more` : "";
+    return `${stage} readiness is incomplete: ${labels}${remainder}.`;
+  }
+
+  /*
+    What the organisation's rules say is outstanding for this gate's proposed stage.
+
+    Exported so the page can show it before somebody commits, and so a decision can record it.
+    Answering with an empty list when the rules cannot be evaluated is deliberate: an unavailable
+    checklist is not evidence of a problem, and must not read as one.
+  */
+  function readinessFor(gateSource) {
+    const gate = normaliseGate(gateSource);
+    const project = findProject(gate.projectCode);
+    if (!project || !gate.proposedNextStage || !window.PPMAdmin?.evaluateProjectStage) {
+      return { outstanding: [], summary: "" };
+    }
+    const readiness = window.PPMAdmin.evaluateProjectStage(project, gate.proposedNextStage, {
+      includeRelated: true
+    });
+    if (readiness.valid) return { outstanding: [], summary: "" };
+    const outstanding = readiness.missing.map((item) => item.label);
+    return { outstanding, summary: readinessSentence(gate.proposedNextStage, readiness.missing) };
   }
 
   /*
@@ -1209,21 +1271,13 @@
         throw new Error("Conditions are required for conditional approval.");
       if (["Deferred", "Rejected"].includes(toStatus) && !reason)
         throw new Error(`A reason is required when a gate is ${toStatus.toLowerCase()}.`);
-      if (toStatus === "Approved" && window.PPMAdmin?.evaluateProjectStage) {
-        const readiness = window.PPMAdmin.evaluateProjectStage(
-          findProject(gate.projectCode),
-          gate.proposedNextStage,
-          { includeRelated: true }
-        );
-        if (!readiness.valid) {
-          const labels = readiness.missing
-            .slice(0, 8)
-            .map((item) => item.label)
-            .join(", ");
-          const remainder = readiness.missing.length > 8 ? ` and ${readiness.missing.length - 8} more` : "";
-          throw new Error(`${gate.proposedNextStage} readiness is incomplete: ${labels}${remainder}.`);
-        }
-      }
+      /*
+        Readiness is recorded, not enforced. This used to throw, which meant an approver who had
+        decided to proceed had no way to say so - and no trace of the decision survived. The
+        outstanding items now travel onto the decision, so the history reads "Approved, with 4
+        readiness items outstanding" and names them.
+      */
+      const outstandingAtDecision = readinessFor(gate).outstanding;
       const unlinkedActions = gate.actionsArising.filter((item) => !item.actionId);
       if (unlinkedActions.some((item) => !item.ownerResourceId))
         throw new Error(
@@ -1277,6 +1331,16 @@
         comments,
         conditions,
         reason,
+        /*
+          What the readiness rules said was outstanding at the moment of the decision.
+
+          The point of not blocking is that the decision belongs to the person. The point of
+          recording this is that the decision should say what they were looking at when they made
+          it - six months later, "approved with the security test and training status outstanding"
+          is the sentence somebody needs, and it cannot be reconstructed afterwards because the
+          items get completed in the meantime.
+        */
+        readinessOutstanding: outstandingAtDecision,
         decidedAt: nowIso()
       });
     }
@@ -1629,6 +1693,7 @@
     canEdit,
     canApprove,
     namedApproverOfAny,
+    readinessFor,
     canOverride,
     isAssignedApprover,
     isSelfApproval,
