@@ -3,12 +3,50 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RESOURCE_NAME_WIDTH = 234;
 const RESOURCE_METRIC_WIDTH = 82;
+/*
+  The zoom levels.
+
+  `day` is the one this view was missing, and it is the one people ask for: a fortnight of real
+  dates, one column each, is how somebody actually reads "who is free on Thursday". The others
+  remain for looking further out.
+
+  Widths are the column width in pixels. minimumBuckets keeps a short timeline from collapsing to
+  three columns and looking broken.
+*/
 const ZOOM_CONFIG = {
+  day: { width: 154, label: "Day", minimumBuckets: 14 },
   week: { width: 105, label: "Week", minimumBuckets: 26 },
   month: { width: 118, label: "Month", minimumBuckets: 18 },
   quarter: { width: 142, label: "Quarter", minimumBuckets: 12 },
   year: { width: 165, label: "Year", minimumBuckets: 10 }
 };
+
+/*
+  Saturday and Sunday.
+
+  They are not working days: they are excluded from every "for N work days" count and from the
+  capacity arithmetic, and their columns are shaded so a bar crossing a weekend visibly costs
+  nothing. They are still real columns, because work does land on them - a release weekend, a
+  data migration - and a view that hid them would make that work impossible to see or plan.
+*/
+function isWeekend(date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+/*
+  Working days in a range, inclusive of both ends.
+
+  Delegated to PPMPlanning, which is where every piece of capacity and duration arithmetic in this
+  application lives. A local copy was written here first and deleted immediately: the capacity
+  tab, the heatmap, the runway projection and the demand form all call the shared one, and two
+  implementations of "how long is this in working days" is exactly how a Gantt starts disagreeing
+  with the report built from the same data.
+*/
+function workingDaysBetween(start, finish) {
+  if (!start || !finish) return 0;
+  return PPMPlanning.workingDaysBetween(isoDate(start), isoDate(finish));
+}
 
 let resources = [];
 let assignments = [];
@@ -50,7 +88,12 @@ function startOfWeek(date) {
   return result;
 }
 
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 function startOfUnit(date, unit) {
+  if (unit === "day") return startOfDay(date);
   if (unit === "week") return startOfWeek(date);
   if (unit === "month") return new Date(date.getFullYear(), date.getMonth(), 1);
   if (unit === "quarter") return new Date(date.getFullYear(), Math.floor(date.getMonth() / 3) * 3, 1);
@@ -58,6 +101,7 @@ function startOfUnit(date, unit) {
 }
 
 function nextUnit(date, unit) {
+  if (unit === "day") return addDays(date, 1);
   if (unit === "week") return addDays(date, 7);
   if (unit === "month") return new Date(date.getFullYear(), date.getMonth() + 1, 1);
   if (unit === "quarter") return new Date(date.getFullYear(), date.getMonth() + 3, 1);
@@ -65,17 +109,26 @@ function nextUnit(date, unit) {
 }
 
 function previousUnit(date, unit) {
+  if (unit === "day") return addDays(date, -1);
   if (unit === "week") return addDays(date, -7);
   if (unit === "month") return new Date(date.getFullYear(), date.getMonth() - 1, 1);
   if (unit === "quarter") return new Date(date.getFullYear(), date.getMonth() - 3, 1);
   return new Date(date.getFullYear() - 1, 0, 1);
 }
 
+/*
+  What a column is called.
+
+  Week columns used to read "W32 · 10 Aug". The week number is a calendar fact almost nobody
+  holds in their head, and it was the first thing in the label - so the date, which is what people
+  actually navigate by, came second and was easy to miss. Dates only now, at every zoom.
+*/
 function bucketLabel(date, unit) {
+  if (unit === "day") {
+    return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  }
   if (unit === "week") {
-    const firstDay = new Date(date.getFullYear(), 0, 1);
-    const week = Math.ceil(((date - firstDay) / DAY_MS + firstDay.getDay() + 1) / 7);
-    return `W${week} · ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}`;
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
   }
   if (unit === "month") return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
   if (unit === "quarter") return `Q${Math.floor(date.getMonth() / 3) + 1} ${date.getFullYear()}`;
@@ -276,6 +329,128 @@ function buildTimeline(taskAssignments, absenceRows = []) {
   return { minimum, maximum: cursor };
 }
 
+
+/* ---------------------------------------------------------------- day series
+
+   The rebuilt timeline works a day at a time regardless of zoom, because the questions it
+   answers - is this person over-committed, and for how long - are daily questions. The columns
+   are only how the answer is drawn.
+*/
+
+/* Every day the timeline covers, as a flat list. Cheap enough at these ranges, and it makes the
+   run-merging below trivial to read. */
+function timelineDays() {
+  const days = [];
+  if (!timelineBuckets.length) return days;
+  const cursor = startOfDay(timelineBuckets[0].start);
+  const end = startOfDay(timelineBuckets[timelineBuckets.length - 1].end);
+  let safety = 0;
+  while (cursor < end && safety < 4000) {
+    days.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+    safety += 1;
+  }
+  return days;
+}
+
+function coversDay(assignment, day) {
+  if (!assignment.startDate || !assignment.finishDate) return false;
+  const value = day.getTime();
+  return startOfDay(assignment.startDate).getTime() <= value && startOfDay(assignment.finishDate).getTime() >= value;
+}
+
+/* Total allocation on one day, across everything this person is on. */
+function allocationOnDay(resourceAssignments, day) {
+  return resourceAssignments
+    .filter((assignment) => coversDay(assignment, day))
+    .reduce((total, assignment) => total + assignment.allocation, 0);
+}
+
+/*
+  Consecutive days at the same over-allocation, merged into one span.
+
+  One bar per day was the alternative, and at day zoom across a month it becomes a row of small
+  blocks that says "there is a problem somewhere here". Merged runs say "130% for four days,
+  starting Monday", which is the sentence somebody needs in order to do something about it.
+
+  Weekends are skipped: nobody is over-committed on a day they are not working, and drawing it
+  would make every fortnight look like a crisis.
+*/
+function overAllocationRuns(resourceAssignments) {
+  const threshold = PPMPlanning.getResourceConfig().overAllocationThreshold;
+  const runs = [];
+  let open = null;
+
+  timelineDays().forEach((day) => {
+    const total = isWeekend(day) ? 0 : allocationOnDay(resourceAssignments, day);
+    const over = total > threshold;
+    if (open && over && total === open.percent) {
+      open.finish = day;
+      return;
+    }
+    if (open) {
+      runs.push(open);
+      open = null;
+    }
+    if (over) open = { start: day, finish: day, percent: total };
+  });
+  if (open) runs.push(open);
+  return runs;
+}
+
+/*
+  The gaps in somebody's schedule, and how much of them is free.
+
+  This is the half of the picture the coloured bars do not show. A view that only draws work
+  answers "who is busy"; the question a resource manager is usually asking is "who can take
+  this", and that needs the spare hours stated rather than inferred from white space.
+
+  A gap is a run of consecutive working days below the warning threshold. The hours per day come
+  from PPMPlanning.availableCapacity, which is the one place capacity arithmetic lives - a local
+  copy here would drift from the capacity tab within a month.
+*/
+function availabilityRuns(resource, resourceAssignments) {
+  const threshold = PPMPlanning.getResourceConfig().warningThreshold;
+  const runs = [];
+  let open = null;
+
+  timelineDays().forEach((day) => {
+    const free = !isWeekend(day) && allocationOnDay(resourceAssignments, day) < threshold;
+    if (free) {
+      if (!open) open = { start: day, finish: day, days: 1 };
+      else {
+        open.finish = day;
+        open.days += 1;
+      }
+      return;
+    }
+    if (open) {
+      runs.push(open);
+      open = null;
+    }
+  });
+  if (open) runs.push(open);
+
+  return runs.map((run) => {
+    const startIso = isoDate(run.start);
+    const finishIso = isoDate(run.finish);
+    const capacity = PPMPlanning.availableCapacity(resource, startIso, finishIso);
+    const committed = timelineDays()
+      .filter((day) => !isWeekend(day) && day >= run.start && day <= run.finish)
+      .reduce((total, day) => total + allocationOnDay(resourceAssignments, day), 0);
+    /* Spare hours per working day, after what is already committed across the run. */
+    const perDay = run.days ? Math.max(0, (capacity.available * (1 - committed / (100 * run.days))) / run.days) : 0;
+    return { ...run, perDay: Math.round(perDay * 100) / 100 };
+  });
+}
+
+/* A bar spanning two dates, positioned in pixels. Shared by every span the timeline draws. */
+function spanGeometry(start, finish) {
+  const left = positionForDate(start);
+  const right = positionForDate(addDays(finish, 1));
+  return { left, width: Math.max(10, right - left) };
+}
+
 function overlapsBucket(assignment, bucket) {
   if (!assignment.startDate || !assignment.finishDate) return false;
   const finishExclusive = addDays(assignment.finishDate, 1);
@@ -373,7 +548,11 @@ function timelineCells(contentFunction) {
   return timelineBuckets
     .map((bucket, index) => {
       const includesToday = isoDate(bucket.start) <= today && isoDate(addDays(bucket.end, -1)) >= today;
-      return `<div class="timeline-cell ${includesToday ? "today" : ""}">${contentFunction ? contentFunction(bucket, index) : ""}</div>`;
+      /* Only meaningful at day zoom: a week column contains both kinds. */
+      const weekend = zoom === "day" && isWeekend(bucket.start);
+      return `<div class="timeline-cell${includesToday ? " today" : ""}${weekend ? " weekend" : ""}">${
+        contentFunction ? contentFunction(bucket, index) : ""
+      }</div>`;
     })
     .join("");
 }
@@ -429,30 +608,93 @@ function resourceRow(resource, resourceAssignments, absenceRows) {
             ${metricMarkup("peak", `${peak}%`)}
             ${metricMarkup("over", `${over}%`, over ? "over-threshold" : "within-threshold")}
           </div>
-          <div class="timeline-row"${styleAttr(timelineStyle())}>${timelineCells((bucket, index) => `<span class="allocation-cell ${allocationClass(allocations[index])}">${allocations[index] ? `${allocations[index]}%` : ""}</span>`)}${ownAbsences.map(absenceBand).join("")}</div>
+          <div class="timeline-row"${styleAttr(timelineStyle())}>${timelineCells(
+            (bucket, index) =>
+              `<span class="allocation-cell ${allocationClass(allocations[index])}">${allocations[index] ? `${allocations[index]}%` : ""}</span>`
+          )}${overAllocationRuns(resourceAssignments).map(overAllocationBar).join("")}${ownAbsences.map(absenceBand).join("")}</div>
         </div>
       `;
 }
 
+/*
+  One red bar per run of over-allocated days, labelled once with the percentage.
+
+  Drawn on the resource row rather than on any one task, because over-allocation is a property of
+  the person on that day - it is the sum of everything they are on, and no single bar is at fault.
+*/
+function overAllocationBar(run) {
+  const { left, width } = spanGeometry(run.start, run.finish);
+  const days = workingDaysBetween(run.start, run.finish);
+  const label = `${run.percent}% allocated · ${days} work day${days === 1 ? "" : "s"} · ${run.start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} to ${run.finish.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+  return `<div class="overallocation-bar"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(label)}">${run.percent}%</div>`;
+}
+
+/*
+  A grey bar across a run of days where this person has room, saying how much and for how long.
+
+  "Available: 6.4h/d for 5 work days" is a sentence somebody can act on. An empty stretch of
+  timeline is not.
+*/
+function availabilityBar(run) {
+  const { left, width } = spanGeometry(run.start, run.finish);
+  const label = `Available: ${run.perDay}h/d for ${run.days} work day${run.days === 1 ? "" : "s"}`;
+  const range = `${run.start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} to ${run.finish.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+  return `<div class="availability-bar"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(`${label} · ${range}`)}"><b>Available:</b> ${escapeHtml(`${run.perDay}h/d for ${run.days} work day${run.days === 1 ? "" : "s"}`)}</div>`;
+}
+
+/*
+  One assignment, on its own line under the person.
+
+  THE LABEL LIVES ON THE BAR
+
+  It used to sit in the left pane, with the bar carrying only "30%". That works when a person has
+  two assignments and stops working at five, which is the normal case here - the left pane cannot
+  show ten task names without becoming taller than the timeline. Putting the whole sentence on the
+  bar - plan, task, allocation, duration - means one line per assignment however many there are,
+  and the reading order matches how somebody scans it: along the row, in time.
+
+  Truncation is the browser's, by overflow. A short bar shows what fits and the rest is in the
+  hover card, which is the only thing that can hold a full sentence at day zoom.
+*/
 function taskRow(assignment, absenceRows) {
-  let bar = "";
   const conflicts = assignmentAbsences(assignment, absenceRows);
+  const planUrl = `project-plan.html?code=${encodeURIComponent(assignment.projectCode)}`;
+  let bar = "";
+
   if (assignment.startDate && assignment.finishDate) {
-    const left = positionForDate(assignment.startDate);
-    const right = positionForDate(addDays(assignment.finishDate, 1));
-    const width = Math.max(12, right - left);
+    const { left, width } = spanGeometry(assignment.startDate, assignment.finishDate);
+    const days = workingDaysBetween(assignment.startDate, assignment.finishDate);
     const barClass =
       assignment.allocation > PPMPlanning.getResourceConfig().overAllocationThreshold
         ? "over"
         : assignment.taskStatus === "Complete"
           ? "complete"
           : "";
-    bar = `<div class="task-bar ${barClass}"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(assignment.taskName)} · ${assignment.allocation}%${conflicts.length ? ` · Unavailable: ${conflicts.map(absenceReason).join("; ")}` : ""}">${escapeHtml(assignment.allocation)}%</div>`;
+    const label = `${assignment.projectName} | ${assignment.taskName} – ${assignment.allocation}% for ${days} work day${days === 1 ? "" : "s"}`;
+
+    /*
+      The hover card's contents travel as data attributes rather than a title attribute: a title
+      cannot carry six labelled rows, and this is the card in the second screenshot. Read by the
+      delegated pointer handler at the bottom of this file.
+    */
+    bar =
+      `<div class="task-bar ${barClass}"${styleAttr(`left:${left}px;width:${width}px`)}` +
+      ` data-card-resource="${escapeHtml(assignment.resourceName)}"` +
+      ` data-card-plan="${escapeHtml(assignment.projectName)}"` +
+      ` data-card-task="${escapeHtml(assignment.taskName)}"` +
+      ` data-card-status="${escapeHtml(assignment.taskStatus || "Scheduled")}"` +
+      ` data-card-from="${escapeHtml(assignment.startDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}"` +
+      ` data-card-to="${escapeHtml(assignment.finishDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}"` +
+      ` data-card-allocation="${escapeHtml(`${assignment.allocation}% for ${days} work day${days === 1 ? "" : "s"}`)}"` +
+      ` data-card-project="${escapeHtml(assignment.projectCode)}"` +
+      `${conflicts.length ? ` data-card-conflict="${escapeHtml(conflicts.map(absenceReason).join("; "))}"` : ""}` +
+      `><span class="task-bar-label">${escapeHtml(label)}</span></div>`;
   }
-  const planUrl = `project-plan.html?code=${encodeURIComponent(assignment.projectCode)}`;
+
   const conflictLabel = conflicts.length
     ? `<div class="absence-warning">Unavailable: ${escapeHtml(conflicts.map(absenceReason).join("; "))}</div>`
     : "";
+
   return `
         <div class="gantt-row task-row ${conflicts.length ? "has-absence-conflict" : ""}">
           <div class="row-details">
@@ -462,6 +704,18 @@ function taskRow(assignment, absenceRows) {
             ${metricMarkup("over", assignment.startDate && assignment.finishDate ? "" : '<span class="unscheduled">Dates required</span>')}
           </div>
           <div class="timeline-row"${styleAttr(timelineStyle())}>${timelineCells()}${bar}${conflicts.map((absence) => absenceConflictSegment(assignment, absence)).join("")}</div>
+        </div>
+      `;
+}
+
+/* The spare-capacity line, drawn once per person beneath their assignments. */
+function availabilityRow(resource, resourceAssignments) {
+  const runs = availabilityRuns(resource, resourceAssignments);
+  if (!runs.length) return "";
+  return `
+        <div class="gantt-row availability-row">
+          <div class="row-details"><div class="availability-caption">Spare capacity</div></div>
+          <div class="timeline-row"${styleAttr(timelineStyle())}>${timelineCells()}${runs.map(availabilityBar).join("")}</div>
         </div>
       `;
 }
@@ -476,6 +730,100 @@ function groupedResources(resourceList) {
     groups.get(group).push(resource);
   });
   return [...groups.entries()].sort((first, second) => first[0].localeCompare(second[0]));
+}
+
+
+/* ------------------------------------------------------------------ hover card
+
+   The full sentence for one assignment: who, which plan, which task, its status, the dates, the
+   allocation and the project it belongs to.
+
+   A title attribute cannot do this - it is one line of unstyled text, it takes a second to
+   appear, and it cannot be read by touch or keyboard. So the card is a real element, positioned
+   next to the bar, populated from the data attributes taskRow() writes.
+
+   One element for the whole page, moved around, rather than one per bar: there can be several
+   hundred bars at day zoom and building a card into each would be that many nodes doing nothing.
+
+   Position is geometry, so it travels through PPMCore.applyComputedStyles like every other
+   computed value here - style attributes are blocked by the policy.
+*/
+let hoverCard = null;
+
+function ensureHoverCard() {
+  if (hoverCard && hoverCard.isConnected) return hoverCard;
+  hoverCard = document.createElement("div");
+  hoverCard.className = "assignment-card";
+  hoverCard.setAttribute("role", "tooltip");
+  hoverCard.hidden = true;
+  document.body.appendChild(hoverCard);
+  return hoverCard;
+}
+
+function rowMarkup(label, value) {
+  return `<div class="assignment-card-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`;
+}
+
+function showAssignmentCard(bar) {
+  const card = ensureHoverCard();
+  const data = bar.dataset;
+  card.innerHTML =
+    `<div class="assignment-card-head">${escapeHtml(data.cardResource || "")}<br /><b>${escapeHtml(data.cardPlan || "")}</b></div>` +
+    `<div class="assignment-card-task">${escapeHtml(data.cardTask || "")}</div>` +
+    `<span class="assignment-card-status">${escapeHtml(data.cardStatus || "Scheduled")}</span>` +
+    rowMarkup("From", data.cardFrom || "") +
+    rowMarkup("To", data.cardTo || "") +
+    rowMarkup("Allocation", data.cardAllocation || "") +
+    rowMarkup("Project", data.cardProject || "") +
+    (data.cardConflict ? `<div class="assignment-card-conflict">Unavailable: ${escapeHtml(data.cardConflict)}</div>` : "");
+
+  card.hidden = false;
+
+  /* Measured after it is populated, so a long task name does not push the card off-screen. */
+  const bounds = bar.getBoundingClientRect();
+  const width = card.offsetWidth;
+  const height = card.offsetHeight;
+  const margin = 12;
+  let left = bounds.left + window.scrollX + 24;
+  let top = bounds.bottom + window.scrollY + 8;
+  if (left + width + margin > window.scrollX + document.documentElement.clientWidth) {
+    left = Math.max(window.scrollX + margin, window.scrollX + document.documentElement.clientWidth - width - margin);
+  }
+  /* Flip above the bar when there is no room below, rather than hanging off the fold. */
+  if (bounds.bottom + height + margin > document.documentElement.clientHeight) {
+    top = bounds.top + window.scrollY - height - 8;
+  }
+  /* Through the same data attribute every computed value on this page uses: style attributes are
+     blocked by the policy, and PPMCore applies these through CSSOM. */
+  card.setAttribute("data-ppm-style", `left:${Math.round(left)}px;top:${Math.round(top)}px`);
+  PPMCore.applyComputedStyles(card);
+}
+
+function hideAssignmentCard() {
+  if (hoverCard) hoverCard.hidden = true;
+}
+
+/* Delegated, so it keeps working across every re-render without rebinding hundreds of bars. */
+function bindAssignmentCard() {
+  const content = document.getElementById("ganttContent");
+  if (!content || content.dataset.cardBound === "true") return;
+  content.dataset.cardBound = "true";
+  content.addEventListener("pointerover", (event) => {
+    const bar = event.target.closest(".task-bar[data-card-task]");
+    if (bar) showAssignmentCard(bar);
+  });
+  content.addEventListener("pointerout", (event) => {
+    const bar = event.target.closest(".task-bar[data-card-task]");
+    const goingTo = event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest(".task-bar");
+    if (bar && goingTo !== bar) hideAssignmentCard();
+  });
+  /* Keyboard and touch reach it too: the bars are focusable, and scrolling dismisses it. */
+  content.addEventListener("focusin", (event) => {
+    const bar = event.target.closest(".task-bar[data-card-task]");
+    if (bar) showAssignmentCard(bar);
+  });
+  content.addEventListener("focusout", hideAssignmentCard);
+  content.addEventListener("scroll", hideAssignmentCard, { passive: true });
 }
 
 function renderGantt() {
@@ -496,6 +844,7 @@ function renderGantt() {
       resourceAssignments.forEach((assignment) => {
         html += taskRow(assignment, absenceRows);
       });
+      html += availabilityRow(resource, resourceAssignments);
     });
   });
 
@@ -511,6 +860,8 @@ function renderGantt() {
   /* Applied here rather than left to PPMCore's observer, which runs a turn later and
      would show one frame of a gantt with no column widths. */
   PPMCore.applyComputedStyles(ganttContent);
+  bindAssignmentCard();
+  hideAssignmentCard();
   document.getElementById("timelineRange").textContent =
     `${range.minimum.toLocaleDateString("en-GB", { month: "short", year: "numeric" })} to ${range.maximum.toLocaleDateString("en-GB", { month: "short", year: "numeric" })} · ${ZOOM_CONFIG[zoom].label} zoom`;
 

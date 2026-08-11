@@ -692,3 +692,175 @@ main {
     --page-gutter: 18px;
   }
 }
+
+/* ==========================================================================
+   Stage 20 — the dense day-level timeline
+
+   The view now draws one line per assignment rather than one aggregate row per person, so the
+   rules below are about fitting more information into less height without it becoming a smear:
+   shorter rows, the label on the bar rather than in the left pane, and colour used only where it
+   carries meaning.
+
+   The palette is unchanged - plum for work, amber for absence, red for over-allocation. Only the
+   density and the layering are different.
+   ========================================================================== */
+
+/* Rows tighten up: the whole point is seeing ten assignments at once. */
+.gantt-row.task-row,
+.gantt-row.availability-row {
+  min-height: 34px;
+}
+.task-row .timeline-cell,
+.availability-row .timeline-cell {
+  min-height: 34px;
+}
+
+/* The label now lives on the bar, so the bar has to be readable rather than a colour chip. */
+.task-bar {
+  top: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 4px;
+  background: var(--ppm-plum, #5b294f);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.22);
+  font-weight: 600;
+  line-height: 24px;
+  text-align: left;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+.task-bar-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-bar:focus-visible {
+  outline: 3px solid rgba(157, 220, 249, 0.75);
+  outline-offset: 1px;
+}
+
+/* Over-allocation: a red bar above the person's own row, spanning the run it applies to.
+   Sits at the top of the row so it reads as a header for the block beneath it. */
+.overallocation-bar {
+  position: absolute;
+  top: 1px;
+  z-index: 5;
+  height: 13px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 13px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Spare capacity: deliberately quiet. It is context, not an instruction. */
+.availability-row .row-details {
+  padding-left: 18px;
+  background: #fff;
+}
+.availability-caption {
+  color: #94a3b8;
+  font-size: 11px;
+  font-style: italic;
+}
+.availability-bar {
+  position: absolute;
+  top: 6px;
+  z-index: 1;
+  height: 22px;
+  overflow: hidden;
+  padding: 0 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.availability-bar b {
+  color: #334155;
+  font-weight: 700;
+}
+
+/* Weekends. Shaded at every zoom where a column is a single day, so a bar crossing one visibly
+   costs nothing - the durations on the bars are working days. Work can still be placed there;
+   this greys the ground, it does not block it. */
+.timeline-cell.weekend {
+  background: repeating-linear-gradient(
+    135deg,
+    #f1f5f9,
+    #f1f5f9 6px,
+    #e9eef5 6px,
+    #e9eef5 12px
+  );
+}
+.gantt-header .timeline-cell.weekend {
+  background: #eef2f7;
+  color: #94a3b8;
+}
+
+/* ------------------------------------------------------------- the hover card */
+.assignment-card {
+  position: absolute;
+  z-index: 1300;
+  width: 320px;
+  padding: 14px 16px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.26);
+  color: #172033;
+  font-size: 13px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+.assignment-card[hidden] {
+  display: none !important;
+}
+.assignment-card-head {
+  margin: 0 0 4px;
+  color: #475569;
+  font-size: 12.5px;
+}
+.assignment-card-head b {
+  color: #172033;
+  font-size: 14px;
+}
+.assignment-card-task {
+  margin: 0 0 9px;
+  color: #334155;
+}
+.assignment-card-status {
+  display: inline-block;
+  margin: 0 0 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: var(--ppm-plum, #5b294f);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.assignment-card-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 10px;
+  padding: 3px 0;
+}
+.assignment-card-row span {
+  color: #64748b;
+}
+.assignment-card-conflict {
+  margin: 9px 0 0;
+  padding: 7px 9px;
+  border-left: 3px solid #d97706;
+  border-radius: 4px;
+  background: #fffbeb;
+  color: #7c4a03;
+  font-size: 12px;
+}
