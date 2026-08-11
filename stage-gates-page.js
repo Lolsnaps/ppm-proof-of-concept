@@ -488,11 +488,27 @@ function renderWorkflow(gate) {
     Cancelled: "danger"
   };
   const approvalOutcomes = new Set(["Approved", "Conditionally Approved", "Deferred", "Rejected"]);
+  /*
+    Stage 18: a named approver's decision buttons carry no permission requirement.
+
+    PPMAuth disables any control whose permission the person lacks, so tagging these
+    stageGates.approve meant a named approver without that role saw four buttons and could press
+    none of them. The greyed-out button was the reported symptom.
+
+    Removing the tag loses nothing, because allowedTransitions() has already decided: a button
+    only exists here if this person may take that action on this gate. The database re-checks
+    every one of those rules anyway, which is what actually enforces them.
+  */
+  const namedApprover = PPMStageGates.isAssignedApprover(gate);
   let buttons = actions
-    .map(
-      (status) =>
-        `<button type="button" class="button small ${classes[status] || ""}" data-permission="${approvalOutcomes.has(status) ? "stageGates.approve" : "stageGates.submit"}" data-transition="${escapeHtml(status)}">${escapeHtml(labels[status])}</button>`
-    )
+    .map((status) => {
+      const permission = approvalOutcomes.has(status)
+        ? namedApprover
+          ? "none"
+          : "stageGates.approve"
+        : "stageGates.submit";
+      return `<button type="button" class="button small ${classes[status] || ""}" data-permission="${permission}" data-transition="${escapeHtml(status)}">${escapeHtml(labels[status])}</button>`;
+    })
     .join("");
   if (gate.routeRequirement === "Not Applicable" && gate.workflowStatus === "Draft") {
     if (gate.routeApprovalStatus !== "Pending" || !gate.routeRequestedAt)
@@ -507,9 +523,34 @@ function renderWorkflow(gate) {
       buttons += `<button type="button" class="button success small" data-permission="stageGates.override" data-route-action="Approved">Approve N/A</button><button type="button" class="button danger small" data-permission="stageGates.override" data-route-action="Rejected">Reject N/A</button>`;
     }
   }
+  /*
+    Why there is nothing to do, rather than "your account cannot".
+
+    The single message this replaced - "No workflow actions are available to your account for
+    this record" - reads as a permission problem whatever the actual reason. On a Draft gate it
+    sent somebody looking for the missing permission for half a day, when the honest answer was
+    that nobody can approve a gate that has not been submitted yet.
+  */
+  const noActionReason = (() => {
+    if (gate.workflowStatus === "Draft")
+      return PPMStageGates.isAssignedApprover(gate)
+        ? "You are a required approver on this gate, but it has not been submitted yet. " +
+          "Nothing can be approved until the gate owner submits it."
+        : "This gate is still a draft. It has to be submitted before anyone can decide it.";
+    if (gate.workflowStatus === "Approved" || gate.workflowStatus === "Cancelled")
+      return `This gate is ${String(gate.workflowStatus).toLowerCase()} and is now read-only.`;
+    if (["Submitted", "Conditionally Approved"].includes(gate.workflowStatus)) {
+      if (!PPMStageGates.isAssignedApprover(gate))
+        return "Only the people named as required approvers on this gate can decide it. " +
+          "You are not one of them.";
+      return "You submitted or own this gate, so you cannot also decide it. " +
+        "Another required approver has to.";
+    }
+    return "There is nothing to do on this gate from its current status.";
+  })();
+
   document.getElementById("workflowActions").innerHTML =
-    buttons ||
-    '<span class="row-note">No workflow actions are available to your account for this record.</span>';
+    buttons || `<span class="row-note">${escapeHtml(noActionReason)}</span>`;
   document.getElementById("workflowGuidance").textContent =
     gate.workflowStatus === "Approved"
       ? `This gate advanced ${gate.projectCode} to ${gate.proposedNextStage}. The approved record is read-only.`

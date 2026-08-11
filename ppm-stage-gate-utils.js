@@ -130,9 +130,10 @@
 
   function canView(projectCode) {
     if (!window.PPMAuth) return true;
-    return permissionIsRegistered("stageGates.view")
+    const byRole = permissionIsRegistered("stageGates.view")
       ? can("stageGates.view", projectCode)
       : can("projects.view", projectCode);
+    return byRole || namedApproverOfAny(projectCode);
   }
 
   function canEdit(projectCode) {
@@ -198,12 +199,27 @@
     return normalisePerson(resource || {}, fallback || { resourceId: id });
   }
 
+  /*
+    Is this the same person?
+
+    The resource id decides it whenever both sides have one - equal or not. It used to test the
+    ids for equality, then fall through to comparing email addresses, which meant two people who
+    share a mailbox matched, and the "both have ids, so no" line below it could never be reached.
+
+    That was survivable while this only chose which row to highlight. Stage 18 made being named
+    as an approver the authority to decide a gate, so it now answers "may this person approve",
+    and it must answer it the same way the database does - private.is_named_gate_approver()
+    matches on resourceId alone. A browser that is looser than the database offers buttons the
+    database then refuses, which is the least useful place to discover a disagreement.
+
+    Email and name remain the fallback for legacy approver entries recorded before resource ids
+    were carried on them.
+  */
   function samePerson(left, right) {
     const a = normalisePerson(left);
     const b = normalisePerson(right);
-    if (a.resourceId && b.resourceId && a.resourceId === b.resourceId) return true;
+    if (a.resourceId && b.resourceId) return a.resourceId === b.resourceId;
     if (a.email && b.email) return a.email === b.email;
-    if (a.resourceId && b.resourceId) return false;
     return Boolean(a.name && b.name && lower(a.name) === lower(b.name));
   }
 
@@ -848,9 +864,33 @@
     return true;
   }
 
+  /*
+    Stage 18: being named as a required approver IS the authority to decide.
+
+    It used to be one of two conditions - the person had to be named AND their role had to hold
+    stageGates.approve for that project. That is the wrong shape for an approval. An executive
+    who wants a subject-matter expert to sign a gate has to have the expert's role changed for
+    every other screen in the application first, and a sponsor named on a project outside their
+    scope simply cannot act.
+
+    The controls that make an approval mean something are elsewhere and unchanged: the submitter
+    cannot name themselves, you cannot decide a gate you submitted or own, only a named approver
+    can decide, approvers are frozen once a decision is being recorded, and the decision is
+    written by a database trigger from the authenticated identity.
+  */
   function isAssignedApprover(gate, user) {
     const actor = normalisePerson(currentUser(user));
     return gate.requiredApprovers.some((approver) => samePerson(approver, actor));
+  }
+
+  /* Being named is also a reason to be able to see the gate at all: an approver on a project
+     outside their scope must still be able to open the thing they are being asked to sign. */
+  function namedApproverOfAny(projectCode) {
+    const actor = normalisePerson(currentUser());
+    if (!actor?.resourceId && !actor?.email) return false;
+    return flattenStore(readStoreRaw())
+      .filter((gate) => lower(gate.projectCode) === lower(projectCode))
+      .some((gate) => (gate.requiredApprovers || []).some((approver) => samePerson(approver, actor)));
   }
 
   function isSelfApproval(gate, user) {
@@ -885,7 +925,9 @@
     const transitions = [];
     const editable = canEdit(gate.projectCode);
     const assigned = isAssignedApprover(gate, explicitUser);
-    const approvable = canApprove(gate.projectCode) && assigned && !isSelfApproval(gate, explicitUser);
+    /* Stage 18: named, and not their own gate. The role test that used to be here is gone -
+       see isAssignedApprover() for why. */
+    const approvable = assigned && !isSelfApproval(gate, explicitUser);
     if (gate.routeRequirement === "Not Applicable") {
       if (
         editable &&
@@ -1533,8 +1575,7 @@
         gate.requiredApprovers.some(
           (approver) => samePerson(approver, actor) && approver.decision !== "Approved"
         ) &&
-        !isSelfApproval(gate, actor) &&
-        canApprove(gate.projectCode);
+        !isSelfApproval(gate, actor);
       const routeApproval =
         gate.routeRequirement === "Not Applicable" &&
         gate.routeApprovalStatus === "Pending" &&
@@ -1587,6 +1628,7 @@
     canView,
     canEdit,
     canApprove,
+    namedApproverOfAny,
     canOverride,
     isAssignedApprover,
     isSelfApproval,
