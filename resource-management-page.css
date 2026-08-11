@@ -897,3 +897,111 @@ main {
   font-size: 11px;
   font-weight: 700;
 }
+
+/*
+  The expanded Gantt is a full-screen mode, so the page chrome goes with it.
+
+  The session bar carries z-index 1400 - above every page layer, which is what keeps the
+  notification panel from being painted over (see VERIFY-STATIC §6g). The expanded panel is a
+  page layer at 1000, so the bell and the signed-in identity floated over the chart.
+
+  Hiding the chrome is the right answer rather than raising the panel above 1400: this is a mode
+  that fills the window, the notification panel would open across the timeline, and nothing in the
+  header is usable while it is up. Escape and the exit button both leave.
+*/
+body.gantt-expanded .ppm-session-bar,
+body.gantt-expanded header,
+body.gantt-expanded nav {
+  display: none;
+}
+
+/* ------------------------------------------------- the allocation editor
+
+   A small dialogue rather than an inline field on the bar: at day zoom a bar can be a few pixels
+   wide, and an input that small is not editable. It also has to say where the change is going -
+   the project plan, not this page - because that is not obvious from where you clicked. */
+.allocation-dialog {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+}
+.allocation-dialog.visible {
+  display: flex;
+}
+.allocation-dialog-card {
+  width: min(420px, 100%);
+  padding: 20px 22px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.32);
+}
+.allocation-dialog-card h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+.allocation-dialog-task {
+  margin: 0 0 2px;
+  font-weight: 700;
+}
+.allocation-dialog-plan {
+  margin: 0 0 16px;
+  color: #64748b;
+  font-size: 13px;
+}
+.allocation-dialog-card label {
+  display: block;
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.allocation-dialog-card input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 15px;
+}
+.allocation-dialog-note {
+  margin: 12px 0 0;
+  padding: 9px 11px;
+  border-left: 3px solid var(--ppm-plum, #5b294f);
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.allocation-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin: 18px 0 0;
+}
+
+/* A bar is a control now, so it says so. */
+.task-bar[data-edit-task] {
+  cursor: pointer;
+}
+.task-bar[data-edit-task]:hover {
+  filter: brightness(1.12);
+}
+
+/* Drag to scroll. The grab cursor only appears over the background, because bars are click
+   targets rather than drag handles. */
+.gantt-scroll {
+  cursor: grab;
+}
+.gantt-scroll.dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.gantt-scroll .task-bar,
+.gantt-scroll a,
+.gantt-scroll button {
+  cursor: pointer;
+}

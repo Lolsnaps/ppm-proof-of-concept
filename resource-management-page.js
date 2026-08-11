@@ -720,6 +720,9 @@ function taskLine(assignment, absenceRows) {
       ` data-card-allocation="${escapeHtml(`${assignment.allocation}% for ${days} work day${days === 1 ? "" : "s"}`)}"` +
       ` data-card-progress="${escapeHtml(`${progress}% complete`)}"` +
       ` data-card-project="${escapeHtml(assignment.projectCode)}"` +
+      ` data-edit-project="${escapeHtml(assignment.projectCode)}"` +
+      ` data-edit-task="${escapeHtml(assignment.taskId)}"` +
+      ` data-edit-allocation="${escapeHtml(String(assignment.allocation))}"` +
       `${conflicts.length ? ` data-card-conflict="${escapeHtml(conflicts.map(absenceReason).join("; "))}"` : ""}` +
       `><span class="task-bar-label">${escapeHtml(label)}</span></div>`;
   } else {
@@ -786,7 +789,17 @@ function rowMarkup(label, value) {
   return `<div class="assignment-card-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`;
 }
 
-function showAssignmentCard(bar) {
+/*
+  Where the card goes.
+
+  It used to anchor to the left edge of the bar. At day zoom a bar can be two metres of screen
+  wide, so pointing at something in the middle of March produced a card sitting off near January -
+  far enough away that you had to go looking for the thing you were already pointing at.
+
+  It follows the pointer instead, and falls back to the bar's edge for keyboard focus, where there
+  is no pointer to follow.
+*/
+function showAssignmentCard(bar, event) {
   const card = ensureHoverCard();
   const data = bar.dataset;
   card.innerHTML =
@@ -807,15 +820,24 @@ function showAssignmentCard(bar) {
   const width = card.offsetWidth;
   const height = card.offsetHeight;
   const margin = 12;
-  let left = bounds.left + window.scrollX + 24;
-  let top = bounds.bottom + window.scrollY + 8;
+
+  /* The pointer when there is one; the bar's own edge for keyboard focus. */
+  const anchorX = typeof event?.clientX === "number" ? event.clientX : bounds.left;
+  const anchorY = typeof event?.clientY === "number" ? event.clientY : bounds.top;
+
+  let left = anchorX + window.scrollX + 16;
+  let top = anchorY + window.scrollY + 18;
+
   if (left + width + margin > window.scrollX + document.documentElement.clientWidth) {
-    left = Math.max(window.scrollX + margin, window.scrollX + document.documentElement.clientWidth - width - margin);
+    /* Flip to the other side of the pointer rather than clamping to the edge, which would put
+       the card under the cursor and make it flicker. */
+    left = anchorX + window.scrollX - width - 16;
   }
-  /* Flip above the bar when there is no room below, rather than hanging off the fold. */
-  if (bounds.bottom + height + margin > document.documentElement.clientHeight) {
-    top = bounds.top + window.scrollY - height - 8;
+  if (anchorY + height + margin > document.documentElement.clientHeight) {
+    top = anchorY + window.scrollY - height - 14;
   }
+  left = Math.max(window.scrollX + margin, left);
+  top = Math.max(window.scrollY + margin, top);
   /* Through the same data attribute every computed value on this page uses: style attributes are
      blocked by the policy, and PPMCore applies these through CSSOM. */
   card.setAttribute("data-ppm-style", `left:${Math.round(left)}px;top:${Math.round(top)}px`);
@@ -833,7 +855,12 @@ function bindAssignmentCard() {
   content.dataset.cardBound = "true";
   content.addEventListener("pointerover", (event) => {
     const bar = event.target.closest(".task-bar[data-card-task]");
-    if (bar) showAssignmentCard(bar);
+    if (bar) showAssignmentCard(bar, event);
+  });
+  /* Follows while the pointer is inside the bar, so a wide bar does not leave the card behind. */
+  content.addEventListener("pointermove", (event) => {
+    const bar = event.target.closest(".task-bar[data-card-task]");
+    if (bar && hoverCard && !hoverCard.hidden) showAssignmentCard(bar, event);
   });
   content.addEventListener("pointerout", (event) => {
     const bar = event.target.closest(".task-bar[data-card-task]");
@@ -843,10 +870,190 @@ function bindAssignmentCard() {
   /* Keyboard and touch reach it too: the bars are focusable, and scrolling dismisses it. */
   content.addEventListener("focusin", (event) => {
     const bar = event.target.closest(".task-bar[data-card-task]");
-    if (bar) showAssignmentCard(bar);
+    if (bar) showAssignmentCard(bar, null);
   });
   content.addEventListener("focusout", hideAssignmentCard);
+  content.addEventListener("click", (event) => {
+    const bar = event.target.closest(".task-bar[data-edit-task]");
+    if (bar) openAllocationEditor(bar);
+  });
+  content.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const bar = event.target.closest(".task-bar[data-edit-task]");
+    if (!bar) return;
+    event.preventDefault();
+    openAllocationEditor(bar);
+  });
   content.addEventListener("scroll", hideAssignmentCard, { passive: true });
+}
+
+
+/* ------------------------------------------------- editing an allocation here
+
+   Clicking a bar changes the allocation percentage of the plan task it was derived from.
+
+   WHY THIS IS A WRITE TO THE PLAN, NOT TO ANYTHING ON THIS PAGE
+
+   There is no assignments table. Every bar on this timeline is derived, on each render, from a
+   project-plan task that has an owner and dates - so the only thing that can be edited is that
+   task, and the change belongs in the plan where the rest of the task lives. Editing here and
+   storing it here would create a second answer to "how much of this person is on this", and the
+   project plan would go on saying something different.
+
+   Which also means the permission is the plan's: somebody who cannot edit a project's plan
+   cannot change its allocations from this screen either. PPMAuth decides what to show; RLS on
+   public.project_plans decides what actually happens.
+*/
+let editingAssignment = null;
+
+function canEditPlan(projectCode) {
+  return Boolean(window.PPMAuth?.can?.("plan.edit", projectCode));
+}
+
+function closeAllocationEditor() {
+  editingAssignment = null;
+  const dialog = document.getElementById("allocationDialog");
+  if (dialog) dialog.classList.remove("visible");
+}
+
+function openAllocationEditor(bar) {
+  const projectCode = bar.dataset.editProject || "";
+  const taskId = bar.dataset.editTask || "";
+  if (!projectCode || !taskId) return;
+
+  if (!canEditPlan(projectCode)) {
+    showMessage(
+      `Your access roles cannot edit ${projectCode}'s project plan, so its allocations cannot be changed here.`,
+      "error"
+    );
+    return;
+  }
+
+  editingAssignment = { projectCode, taskId };
+  hideAssignmentCard();
+
+  document.getElementById("allocationDialogTask").textContent = bar.dataset.cardTask || taskId;
+  document.getElementById("allocationDialogPlan").textContent =
+    `${bar.dataset.cardPlan || projectCode} · ${bar.dataset.cardResource || "Unassigned"}`;
+  const input = document.getElementById("allocationValue");
+  input.value = String(Number(bar.dataset.editAllocation) || 0);
+  document.getElementById("allocationDialog").classList.add("visible");
+  input.focus();
+  input.select();
+}
+
+/*
+  Writes the new percentage onto the task and saves the plan.
+
+  replaceAll is handed the whole collection with one task changed, which is the shape every
+  caller in this application uses - it diffs and writes only what differs, so the other two
+  hundred plan tasks are not touched and cannot be clobbered by this edit.
+*/
+async function saveAllocation(event) {
+  event.preventDefault();
+  if (!editingAssignment) return;
+
+  const { projectCode, taskId } = editingAssignment;
+  const value = Number(document.getElementById("allocationValue").value);
+  if (!Number.isFinite(value) || value < 0 || value > 999) {
+    showMessage("An allocation must be a percentage between 0 and 999.", "error");
+    return;
+  }
+
+  const plans = PPMStore.plans.read();
+  const tasks = Array.isArray(plans[projectCode]) ? plans[projectCode] : [];
+  const task = tasks.find((row) => row.taskId === taskId);
+  if (!task) {
+    showMessage("That plan task could not be found. Reload the page and try again.", "error");
+    closeAllocationEditor();
+    return;
+  }
+
+  const previous = Number(task.allocationPercentage) || 0;
+  if (previous === value) {
+    closeAllocationEditor();
+    return;
+  }
+
+  task.allocationPercentage = value;
+  task.updatedAt = new Date().toISOString();
+
+  const saved = await PPMStore.plans.replaceAll(plans);
+  if (!saved.ok) {
+    showMessage(saved.message, saved.queued ? "warning" : "error");
+    return;
+  }
+
+  closeAllocationEditor();
+  /* Re-derived rather than patched in place: the bar, the person's totals, the over-allocation
+     runs and the spare capacity all change together, and recomputing is the only way they stay
+     consistent with each other. */
+  loadData();
+  renderGantt();
+  showMessage(
+    `${task.taskName || taskId} is now ${value}% for ${task.taskOwner || "its owner"}, saved to ${projectCode}'s plan.`,
+    "success"
+  );
+}
+
+/* ---------------------------------------------------------- drag to scroll
+
+   A timeline at day zoom is several screens wide, and the alternatives are a scrollbar at the
+   very bottom of a tall panel or a horizontal wheel gesture that not every mouse has. Dragging
+   the background is what people try first.
+
+   Bars are excluded, so a drag that starts on one does not scroll: those are click targets.
+*/
+function bindDragScroll() {
+  const scroller = document.querySelector(".gantt-scroll");
+  if (!scroller || scroller.dataset.dragBound === "true") return;
+  scroller.dataset.dragBound = "true";
+
+  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  let startLeft = 0;
+  let startTop = 0;
+  let moved = false;
+
+  scroller.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    if (event.target.closest(".task-bar, a, button, input, select, textarea")) return;
+    dragging = true;
+    moved = false;
+    startX = event.clientX;
+    startY = event.clientY;
+    startLeft = scroller.scrollLeft;
+    startTop = scroller.scrollTop;
+    scroller.classList.add("dragging");
+  });
+
+  scroller.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - startX;
+    const dy = event.clientY - startY;
+    if (!moved && Math.abs(dx) + Math.abs(dy) > 3) {
+      moved = true;
+      /* Captured only once it is a drag rather than a click, so an ordinary click still lands on
+         whatever is underneath. */
+      scroller.setPointerCapture(event.pointerId);
+    }
+    if (!moved) return;
+    scroller.scrollLeft = startLeft - dx;
+    scroller.scrollTop = startTop - dy;
+  });
+
+  const release = (event) => {
+    if (!dragging) return;
+    dragging = false;
+    scroller.classList.remove("dragging");
+    if (moved && scroller.hasPointerCapture?.(event.pointerId)) {
+      scroller.releasePointerCapture(event.pointerId);
+    }
+  };
+  scroller.addEventListener("pointerup", release);
+  scroller.addEventListener("pointercancel", release);
+  scroller.addEventListener("pointerleave", release);
 }
 
 function renderGantt() {
@@ -880,6 +1087,7 @@ function renderGantt() {
      would show one frame of a gantt with no column widths. */
   PPMCore.applyComputedStyles(ganttContent);
   bindAssignmentCard();
+  bindDragScroll();
   hideAssignmentCard();
   document.getElementById("timelineRange").textContent =
     `${range.minimum.toLocaleDateString("en-GB", { month: "short", year: "numeric" })} to ${range.maximum.toLocaleDateString("en-GB", { month: "short", year: "numeric" })} · ${ZOOM_CONFIG[zoom].label} zoom`;
@@ -1109,12 +1317,23 @@ document.getElementById("deleteViewButton").addEventListener("click", deleteView
 document.getElementById("savedViewSelector").addEventListener("change", function () {
   loadView(this.value);
 });
+document.getElementById("allocationForm").addEventListener("submit", saveAllocation);
+document.getElementById("allocationCancel").addEventListener("click", closeAllocationEditor);
+document.getElementById("allocationDialog").addEventListener("click", (event) => {
+  if (event.target.id === "allocationDialog") closeAllocationEditor();
+});
 document.getElementById("todayButton").addEventListener("click", goToToday);
 document
   .getElementById("expandGanttButton")
   .addEventListener("click", () => setGanttExpanded(!ganttExpanded));
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && ganttExpanded) setGanttExpanded(false);
+  if (event.key !== "Escape") return;
+  /* The dialogue first: Escape should close what is on top, not the mode behind it. */
+  if (editingAssignment) {
+    closeAllocationEditor();
+    return;
+  }
+  if (ganttExpanded) setGanttExpanded(false);
 });
 window.addEventListener("ppm-resource-absence-changed", renderGantt);
 
