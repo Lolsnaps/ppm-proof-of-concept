@@ -461,17 +461,6 @@ body.gantt-expanded {
   min-height: 38px;
   border-color: #dbeafe;
 }
-.resource-row .row-details {
-  z-index: 7;
-  background: #f8fafc;
-  box-shadow: 4px 0 7px rgba(15, 23, 42, 0.12);
-}
-.resource-row .timeline-row {
-  background: #f8fafc;
-}
-.resource-row.overallocated .row-details {
-  box-shadow: inset 4px 0 #dc2626;
-}
 .resource-name {
   font-weight: 700;
 }
@@ -479,12 +468,6 @@ body.gantt-expanded {
   margin-top: 4px;
   color: #64748b;
   font-size: 11px;
-}
-.task-row .row-details {
-  z-index: 7;
-  padding-left: 18px;
-  background: #fff;
-  box-shadow: 4px 0 7px rgba(15, 23, 42, 0.12);
 }
 .task-name {
   font-weight: 700;
@@ -705,15 +688,6 @@ main {
    density and the layering are different.
    ========================================================================== */
 
-/* Rows tighten up: the whole point is seeing ten assignments at once. */
-.gantt-row.task-row,
-.gantt-row.availability-row {
-  min-height: 34px;
-}
-.task-row .timeline-cell,
-.availability-row .timeline-cell {
-  min-height: 34px;
-}
 
 /* The label now lives on the bar, so the bar has to be readable rather than a colour chip. */
 .task-bar {
@@ -759,15 +733,6 @@ main {
 }
 
 /* Spare capacity: deliberately quiet. It is context, not an instruction. */
-.availability-row .row-details {
-  padding-left: 18px;
-  background: #fff;
-}
-.availability-caption {
-  color: #94a3b8;
-  font-size: 11px;
-  font-style: italic;
-}
 .availability-bar {
   position: absolute;
   top: 6px;
@@ -863,4 +828,72 @@ main {
   background: #fffbeb;
   color: #7c4a03;
   font-size: 12px;
+}
+
+/* ==========================================================================
+   Stage 20b — one left-hand cell per person
+
+   Every line used to carry its own details cell, so somebody on eight assignments produced eight
+   left-hand cells: the name once, then the task name repeated beside a bar that already said it.
+   It read as eight separate records rather than one person's week, and it spent the widest column
+   in the view on a duplicate of the label a few inches to its right.
+
+   The block below writes the details once and stacks the lines beside it.
+   ========================================================================== */
+
+.resource-block {
+  display: grid;
+  grid-template-columns: var(--detail-width) auto;
+  min-width: max-content;
+}
+
+/* One tall cell, aligned to the top so a person with ten assignments still reads as a heading
+   rather than floating in the middle of their own block. */
+.resource-details {
+  position: sticky;
+  left: 0;
+  z-index: 7;
+  align-items: start;
+  align-content: start;
+  border-bottom: 2px solid #cbd5e1;
+  background: #f8fafc;
+  box-shadow: 4px 0 7px rgba(15, 23, 42, 0.12);
+}
+.resource-block.overallocated .resource-details {
+  box-shadow:
+    inset 4px 0 #dc2626,
+    4px 0 7px rgba(15, 23, 42, 0.12);
+}
+.resource-lines {
+  border-bottom: 2px solid #cbd5e1;
+}
+
+/* The person's own line: the allocation heat and the red over-allocation runs. */
+.summary-line {
+  background: #f8fafc;
+}
+.task-line,
+.availability-line {
+  min-height: 34px;
+}
+.task-line .timeline-cell,
+.availability-line .timeline-cell {
+  min-height: 34px;
+}
+.availability-line {
+  border-bottom: 0;
+}
+
+/* An assignment nobody has scheduled. Visible rather than silently absent. */
+.task-bar.unscheduled-bar {
+  background: repeating-linear-gradient(135deg, #94a3b8, #94a3b8 7px, #8496ab 7px, #8496ab 14px);
+  color: #fff;
+  font-style: italic;
+}
+
+.resource-unscheduled {
+  margin-top: 6px;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 700;
 }

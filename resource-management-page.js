@@ -594,24 +594,57 @@ function groupRow(groupName) {
       `;
 }
 
-function resourceRow(resource, resourceAssignments, absenceRows) {
+/*
+  One person, as a single block.
+
+  THE LEFT PANE IS ONE CELL, NOT ONE PER LINE
+
+  Every line used to carry its own details cell, so a person on eight assignments produced eight
+  left-hand cells - the name once, then the same task name repeated beside a bar that already
+  said it. It read as eight separate records rather than one person's week, and it spent the
+  widest column in the view on a duplicate of the label six inches to its right.
+
+  Now the details cell is written once and the lines stack beside it. The task name, its project,
+  its allocation, its duration and its progress all live on the bar, which is where somebody
+  reading along a row is already looking.
+*/
+function resourceBlock(resource, resourceAssignments, absenceRows) {
   const allocations = allocationsForResource(resource.resourceId, resourceAssignments);
   const current = currentAllocation(resourceAssignments);
   const peak = allocations.length ? Math.max(...allocations) : 0;
   const over = Math.max(0, peak - PPMPlanning.getResourceConfig().warningThreshold);
   const ownAbsences = absenceRows.filter((absence) => absence.resourceId === resource.resourceId);
+  const availability = availabilityRuns(resource, resourceAssignments);
+
+  const summaryLine = `<div class="timeline-row summary-line"${styleAttr(timelineStyle())}>${timelineCells(
+    (bucket, index) =>
+      `<span class="allocation-cell ${allocationClass(allocations[index])}">${allocations[index] ? `${allocations[index]}%` : ""}</span>`
+  )}${overAllocationRuns(resourceAssignments).map(overAllocationBar).join("")}${ownAbsences.map(absenceBand).join("")}</div>`;
+
+  const taskLines = resourceAssignments.map((assignment) => taskLine(assignment, absenceRows)).join("");
+
+  const availabilityLine = availability.length
+    ? `<div class="timeline-row availability-line"${styleAttr(timelineStyle())}>${timelineCells()}${availability
+        .map(availabilityBar)
+        .join("")}</div>`
+    : "";
+
+  const unscheduled = resourceAssignments.filter((item) => !item.startDate || !item.finishDate).length;
+
   return `
-        <div class="gantt-row resource-row ${over ? "overallocated" : ""}">
-          <div class="row-details">
-            <div><div class="resource-name">${escapeHtml(resource.fullName || resource.resourceId)}</div><div class="resource-meta">${escapeHtml(resourceTeam(resource))} · ${escapeHtml(resourceRole(resource))}</div></div>
+        <div class="resource-block ${over ? "overallocated" : ""}">
+          <div class="row-details resource-details">
+            <div>
+              <div class="resource-name">${escapeHtml(resource.fullName || resource.resourceId)}</div>
+              <div class="resource-meta">${escapeHtml(resourceRole(resource))}</div>
+              <div class="resource-meta">${escapeHtml(resourceTeam(resource))}</div>
+              ${unscheduled ? `<div class="resource-unscheduled">${unscheduled} without dates</div>` : ""}
+            </div>
             ${metricMarkup("current", `${current}%`)}
             ${metricMarkup("peak", `${peak}%`)}
             ${metricMarkup("over", `${over}%`, over ? "over-threshold" : "within-threshold")}
           </div>
-          <div class="timeline-row"${styleAttr(timelineStyle())}>${timelineCells(
-            (bucket, index) =>
-              `<span class="allocation-cell ${allocationClass(allocations[index])}">${allocations[index] ? `${allocations[index]}%` : ""}</span>`
-          )}${overAllocationRuns(resourceAssignments).map(overAllocationBar).join("")}${ownAbsences.map(absenceBand).join("")}</div>
+          <div class="resource-lines">${summaryLine}${taskLines}${availabilityLine}</div>
         </div>
       `;
 }
@@ -656,9 +689,8 @@ function availabilityBar(run) {
   Truncation is the browser's, by overflow. A short bar shows what fits and the rest is in the
   hover card, which is the only thing that can hold a full sentence at day zoom.
 */
-function taskRow(assignment, absenceRows) {
+function taskLine(assignment, absenceRows) {
   const conflicts = assignmentAbsences(assignment, absenceRows);
-  const planUrl = `project-plan.html?code=${encodeURIComponent(assignment.projectCode)}`;
   let bar = "";
 
   if (assignment.startDate && assignment.finishDate) {
@@ -670,15 +702,15 @@ function taskRow(assignment, absenceRows) {
         : assignment.taskStatus === "Complete"
           ? "complete"
           : "";
-    const label = `${assignment.projectName} | ${assignment.taskName} – ${assignment.allocation}% for ${days} work day${days === 1 ? "" : "s"}`;
+    /* Progress moved onto the bar with everything else. It was a metric cell in the left pane,
+       which is the column this change exists to give back to the timeline. */
+    const progress = Number(assignment.percentageComplete) || 0;
+    const label =
+      `${assignment.projectName} | ${assignment.taskName} – ${assignment.allocation}% for ${days} work day${days === 1 ? "" : "s"}` +
+      (progress ? ` · ${progress}% done` : "");
 
-    /*
-      The hover card's contents travel as data attributes rather than a title attribute: a title
-      cannot carry six labelled rows, and this is the card in the second screenshot. Read by the
-      delegated pointer handler at the bottom of this file.
-    */
     bar =
-      `<div class="task-bar ${barClass}"${styleAttr(`left:${left}px;width:${width}px`)}` +
+      `<div class="task-bar ${barClass}" tabindex="0"${styleAttr(`left:${left}px;width:${width}px`)}` +
       ` data-card-resource="${escapeHtml(assignment.resourceName)}"` +
       ` data-card-plan="${escapeHtml(assignment.projectName)}"` +
       ` data-card-task="${escapeHtml(assignment.taskName)}"` +
@@ -686,37 +718,27 @@ function taskRow(assignment, absenceRows) {
       ` data-card-from="${escapeHtml(assignment.startDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}"` +
       ` data-card-to="${escapeHtml(assignment.finishDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}"` +
       ` data-card-allocation="${escapeHtml(`${assignment.allocation}% for ${days} work day${days === 1 ? "" : "s"}`)}"` +
+      ` data-card-progress="${escapeHtml(`${progress}% complete`)}"` +
       ` data-card-project="${escapeHtml(assignment.projectCode)}"` +
       `${conflicts.length ? ` data-card-conflict="${escapeHtml(conflicts.map(absenceReason).join("; "))}"` : ""}` +
       `><span class="task-bar-label">${escapeHtml(label)}</span></div>`;
+  } else {
+    /*
+      An assignment with an owner and no dates. It cannot be drawn anywhere on a timeline, and
+      before this it vanished silently - the person carried the work and the view showed nothing.
+      Said plainly, pinned to the left of the row.
+    */
+    bar = `<div class="task-bar unscheduled-bar"${styleAttr("left:0px;width:340px")} title="${escapeHtml(
+      `${assignment.projectName} · ${assignment.taskName}`
+    )}"><span class="task-bar-label">${escapeHtml(
+      `${assignment.projectName} | ${assignment.taskName} – no dates, so not scheduled`
+    )}</span></div>`;
   }
 
-  const conflictLabel = conflicts.length
-    ? `<div class="absence-warning">Unavailable: ${escapeHtml(conflicts.map(absenceReason).join("; "))}</div>`
-    : "";
-
   return `
-        <div class="gantt-row task-row ${conflicts.length ? "has-absence-conflict" : ""}">
-          <div class="row-details">
-            <div><div class="task-name">${escapeHtml(assignment.taskName)}</div><div class="project-name"><a class="task-link" href="${planUrl}">${escapeHtml(assignment.projectName)}</a> · ${escapeHtml(assignment.projectCode)}</div>${conflictLabel}</div>
-            ${metricMarkup("current", `${assignment.allocation}%`)}
-            ${metricMarkup("peak", `${assignment.percentageComplete}% done`)}
-            ${metricMarkup("over", assignment.startDate && assignment.finishDate ? "" : '<span class="unscheduled">Dates required</span>')}
-          </div>
-          <div class="timeline-row"${styleAttr(timelineStyle())}>${timelineCells()}${bar}${conflicts.map((absence) => absenceConflictSegment(assignment, absence)).join("")}</div>
-        </div>
-      `;
-}
-
-/* The spare-capacity line, drawn once per person beneath their assignments. */
-function availabilityRow(resource, resourceAssignments) {
-  const runs = availabilityRuns(resource, resourceAssignments);
-  if (!runs.length) return "";
-  return `
-        <div class="gantt-row availability-row">
-          <div class="row-details"><div class="availability-caption">Spare capacity</div></div>
-          <div class="timeline-row"${styleAttr(timelineStyle())}>${timelineCells()}${runs.map(availabilityBar).join("")}</div>
-        </div>
+        <div class="timeline-row task-line ${conflicts.length ? "has-absence-conflict" : ""}"${styleAttr(timelineStyle())}>${timelineCells()}${bar}${conflicts
+          .map((absence) => absenceConflictSegment(assignment, absence))
+          .join("")}</div>
       `;
 }
 
@@ -740,7 +762,7 @@ function groupedResources(resourceList) {
 
    A title attribute cannot do this - it is one line of unstyled text, it takes a second to
    appear, and it cannot be read by touch or keyboard. So the card is a real element, positioned
-   next to the bar, populated from the data attributes taskRow() writes.
+   next to the bar, populated from the data attributes taskLine() writes.
 
    One element for the whole page, moved around, rather than one per bar: there can be several
    hundred bars at day zoom and building a card into each would be that many nodes doing nothing.
@@ -774,6 +796,7 @@ function showAssignmentCard(bar) {
     rowMarkup("From", data.cardFrom || "") +
     rowMarkup("To", data.cardTo || "") +
     rowMarkup("Allocation", data.cardAllocation || "") +
+    (data.cardProgress ? rowMarkup("Progress", data.cardProgress) : "") +
     rowMarkup("Project", data.cardProject || "") +
     (data.cardConflict ? `<div class="assignment-card-conflict">Unavailable: ${escapeHtml(data.cardConflict)}</div>` : "");
 
@@ -840,11 +863,7 @@ function renderGantt() {
       const resourceAssignments = taskAssignments
         .filter((assignment) => assignment.resourceId === resource.resourceId)
         .sort((first, second) => (first.startValue || "9999").localeCompare(second.startValue || "9999"));
-      html += resourceRow(resource, resourceAssignments, absenceRows);
-      resourceAssignments.forEach((assignment) => {
-        html += taskRow(assignment, absenceRows);
-      });
-      html += availabilityRow(resource, resourceAssignments);
+      html += resourceBlock(resource, resourceAssignments, absenceRows);
     });
   });
 
