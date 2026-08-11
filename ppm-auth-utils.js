@@ -3,6 +3,18 @@
 
   const SESSION_KEY = "ppmAuthSession";
   const CURRENT_USER_KEY = "ppmCurrentUser";
+  /*
+    The signed-in person's own resolved record, for this tab.
+
+    Not portfolio data and not a cache of the directory: it is who this session belongs to,
+    resolved from public.people at sign-in. It has to be readable synchronously, before hydration
+    has run, because readValidSession() is what every page calls to decide whether to let you in -
+    and it runs long before the adapters have loaded anything.
+
+    sessionStorage, so it dies with the tab, which is the right lifetime for identity. The
+    directory itself is in PPMStore like everything else.
+  */
+  const SESSION_RESOURCE_KEY = "ppmSessionResource";
 
   /*
     Stage 3E removed the browser's own password system. Passwords are verified by
@@ -406,12 +418,29 @@
     So the session's own resource is folded in when the store does not have them yet - which is
     the window before hydration, and nothing else.
   */
+  /*
+    Who this session belongs to, without needing the directory.
+
+    In memory once a page has resolved it; otherwise from sessionStorage, which is what makes a
+    reload work. Both are the same object - the one establishSupabaseSession() built.
+  */
+  function signedInResource() {
+    if (currentResource?.resourceId) return currentResource;
+    const stored = parseJson(sessionStorage.getItem(SESSION_RESOURCE_KEY), null);
+    return stored?.resourceId ? stored : null;
+  }
+
   function getResources() {
     const rows = window.PPMStore ? PPMStore.people.all() : [];
-    if (!currentResource?.resourceId) return rows;
-    return rows.some((row) => row.resourceId === currentResource.resourceId)
-      ? rows
-      : [...rows, currentResource];
+    const mine = signedInResource();
+    if (!mine) return rows;
+    /*
+      The hydrated directory wins when it has them, so that a permission or status change made by
+      an administrator takes effect on the next page load rather than at the next sign-in. The
+      session copy is the fallback for the window before hydration - which is exactly when
+      readValidSession() runs.
+    */
+    return rows.some((row) => row.resourceId === mine.resourceId) ? rows : [...rows, mine];
   }
   function getResource(resourceId) {
     return getResources().find((row) => row.resourceId === resourceId) || null;
@@ -719,6 +748,7 @@
     void reason;
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(CURRENT_USER_KEY);
+    sessionStorage.removeItem(SESSION_RESOURCE_KEY);
     currentSession = null;
     currentResource = null;
   }
@@ -763,9 +793,8 @@
 
     if (index >= 0) rows[index] = resource;
     else rows.push(resource);
-    /* Not saved anywhere. public.people already holds this person - that is where `person` above
-       came from - and hydration will bring the whole directory into PPMStore moments from now.
-       Until then getResources() folds in currentResource, which is set from this object. */
+    /* The directory is not saved - public.people already holds it and hydration will load it.
+       The one record that must outlive this function is this person's own, below. */
 
     const now = Date.now();
     const session = {
@@ -779,6 +808,13 @@
     };
 
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    /*
+      The whole record, not a summary. readValidSession() checks active, accountStatus and
+      accessRole before letting anyone in, and every permission decision on the page needs
+      accessScope, additionalRoles, permissionOverrides and selectedProjectCodes. A summary was
+      what CURRENT_USER_KEY held, and it is not enough to resume a session with.
+    */
+    sessionStorage.setItem(SESSION_RESOURCE_KEY, JSON.stringify(resource));
     sessionStorage.setItem(
       CURRENT_USER_KEY,
       JSON.stringify({
