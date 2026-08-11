@@ -1399,15 +1399,8 @@ async function saveDocument(event) {
       createdAt: existingDocument.createdAt || new Date().toISOString()
     };
 
-    PPMChangeLog.recordRow({
-      before: beforeDocument,
-      after: projectDocuments[documentIndex],
-      entityType: "Project document",
-      entityId: existingDocument.documentId,
-      projectCode: currentProjectCode(),
-      fields: DOCUMENT_AUDIT_FIELDS,
-      name: documentLink.name
-    });
+  /* A PPMChangeLog.recordRow() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
 
     showMessage(`${documentLink.name} was updated.`, "success");
   } else {
@@ -1418,15 +1411,8 @@ async function saveDocument(event) {
 
     projectDocuments.push(addedDocument);
 
-    PPMChangeLog.recordRow({
-      before: null,
-      after: addedDocument,
-      entityType: "Project document",
-      entityId: addedDocument.documentId,
-      projectCode: currentProjectCode(),
-      fields: DOCUMENT_AUDIT_FIELDS,
-      name: documentLink.name
-    });
+  /* A PPMChangeLog.recordRow() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
 
     showMessage(`${documentLink.name} was added.`, "success");
   }
@@ -1471,16 +1457,9 @@ async function confirmDeleteDocument() {
     closeDeleteDocumentConfirmation();
     return;
   }
-  const removedDocument = JSON.parse(JSON.stringify(documentLink));
   projectDocuments = projectDocuments.filter((item) => item.documentId !== pendingDeleteDocumentId);
-  PPMChangeLog.recordDeletion({
-    before: removedDocument,
-    entityType: "Project document",
-    entityId: removedDocument.documentId,
-    projectCode: currentProjectCode(),
-    fields: DOCUMENT_AUDIT_FIELDS,
-    name: removedDocument.name
-  });
+  /* A PPMChangeLog.recordDeletion() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
   closeDeleteDocumentConfirmation();
   await saveProjectDocuments();
   renderDocuments();

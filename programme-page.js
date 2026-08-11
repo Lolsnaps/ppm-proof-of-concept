@@ -344,15 +344,8 @@ async function saveProgramme(event) {
   }
   programmes = programmeResult.programmes;
 
-  PPMChangeLog.recordRow({
-    before: old,
-    after: record,
-    entityType: "Programme",
-    entityId: record.programmeId,
-    fields: PROGRAMME_AUDIT_FIELDS,
-    statusField: "overallStatus",
-    name: record.name
-  });
+  /* A PPMChangeLog.recordRow() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
   const projects = getProjects();
   let projectsChanged = false;
   projects.forEach((project) => {
@@ -515,15 +508,8 @@ async function saveRecord(event) {
     return;
   }
 
-  PPMChangeLog.recordRow({
-    before: id ? findRecord(kind, programmeId, id) : null,
-    after: record,
-    entityType: kind === "milestone" ? "Programme milestone" : "Programme RAID",
-    entityId: record.recordId,
-    fields: kind === "milestone" ? PROGRAMME_MILESTONE_FIELDS : PROGRAMME_RAID_FIELDS,
-    statusField: "status",
-    name: record.title
-  });
+  /* A PPMChangeLog.recordRow() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
   closeRecord();
   renderProgrammes();
   setMessage(`Programme ${kind} saved.`, "success");
@@ -556,14 +542,8 @@ function removeRecord(kind, programmeId, id) {
       }
       store[programmeId] = (store[programmeId] || []).filter((item) => item.recordId !== id);
 
-      PPMChangeLog.recordDeletion({
-        before: record,
-        entityType: kind === "milestone" ? "Programme milestone" : "Programme RAID",
-        entityId: id,
-        fields: kind === "milestone" ? PROGRAMME_MILESTONE_FIELDS : PROGRAMME_RAID_FIELDS,
-        statusField: "status",
-        name: record.title
-      });
+  /* A PPMChangeLog.recordDeletion() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
       renderProgrammes();
       setMessage(`Programme ${kind} removed.`, "success");
     }

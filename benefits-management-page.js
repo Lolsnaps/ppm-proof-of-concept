@@ -448,17 +448,8 @@ async function saveChanges() {
     return;
   }
 
-  PPMChangeLog.trackCollection({
-    before: originalBenefits,
-    after: benefits,
-    idField: "benefitId",
-    only: dirtyIds,
-    entityType: "Benefit",
-    projectCode: (record) => record.projectCode || "",
-    fields: BENEFIT_AUDIT_FIELDS,
-    statusField: "status",
-    name: (record) => record.description || record.benefitId
-  });
+  /* A PPMChangeLog.trackCollection() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
   loadData();
   renderAll();
   showMessage(

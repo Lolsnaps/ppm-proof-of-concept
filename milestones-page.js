@@ -529,17 +529,8 @@ async function saveInlineMilestones() {
   if (!validateInlineMilestones()) return;
   await saveMilestones();
   // Records created, updated and deleted rows in one pass, cell by cell.
-  PPMChangeLog.trackCollection({
-    before: originalMilestones,
-    after: projectMilestones,
-    idField: "milestoneId",
-    only: dirtyMilestoneIds,
-    entityType: "Milestone",
-    projectCode,
-    fields: MILESTONE_AUDIT_FIELDS,
-    statusField: "status",
-    name: (row) => row.milestoneName || row.milestoneId
-  });
+  /* A PPMChangeLog.trackCollection() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
   originalMilestones = new Map(
     projectMilestones.map((item) => [item.milestoneId, JSON.parse(JSON.stringify(item))])
   );
@@ -599,17 +590,8 @@ async function saveMilestone(event) {
   }
 
   await saveMilestones();
-  const savedMilestone = projectMilestones.find((item) => item.milestoneId === milestone.milestoneId);
-  PPMChangeLog.recordRow({
-    before: beforeAudit,
-    after: savedMilestone,
-    entityType: "Milestone",
-    entityId: milestone.milestoneId,
-    projectCode,
-    fields: MILESTONE_AUDIT_FIELDS,
-    statusField: "status",
-    name: milestone.milestoneName
-  });
+  /* A PPMChangeLog.recordRow() call was here. Stage 14: PostgreSQL records every change
+     itself; see the note at the top of ppm-change-log.js for why this one survived it. */
   originalMilestones = new Map(
     projectMilestones.map((item) => [item.milestoneId, JSON.parse(JSON.stringify(item))])
   );

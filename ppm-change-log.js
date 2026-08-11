@@ -251,156 +251,37 @@
     return audit() ? audit().serialise(value) : String(value ?? "");
   }
 
-  function asMap(source, idField) {
-    if (source instanceof Map) return source;
-    const map = new Map();
-    (Array.isArray(source) ? source : []).forEach((row) => {
-      if (row && row[idField]) map.set(String(row[idField]), row);
-    });
-    return map;
-  }
+  /* ============================ Stage 14, finished: this module no longer records anything
 
-  function resolve(value, row) {
-    return typeof value === "function" ? value(row) : value;
-  }
+     WHAT WAS HERE
 
-  function fieldKeys(fields) {
-    return (fields || []).map((item) => (typeof item === "string" ? item : item && item.key)).filter(Boolean);
-  }
+     trackCollection(), recordRow() and recordDeletion() - about 130 lines that diffed a record
+     against its previous version and wrote a browser-side audit entry through
+     PPMAudit.compareAndRecord(), PPMAudit.record() and PPMAudit.diff().
 
-  /*
-    Diff a whole table in one call.
+     WHY IT IS GONE, AND WHY THAT IS NOT A LOSS
 
-    trackCollection({
-      before:      Map or Array of the rows as they were when the page loaded
-      after:       Array of the rows as they are now
-      idField:     "taskId"
-      only:        optional Set of ids to consider (e.g. your dirty-row set)
-      entityType:  "Project plan item"   (must match a LOCATIONS key)
-      projectCode: "PRJ-001" or a function of the row
-      fields:      ["taskName", {key:"status", label:"Status"}, ...]
-      name:        function of the row returning its display name
-      statusField: "status"  (optional, drives the status-movement columns)
-      labels:      { created, updated, deleted } action-label overrides
-    })
+     Stage 14 removed browser-side audit emission because PostgreSQL records every change itself:
+     a trigger on each table writes public.audit_log from the authenticated identity, which
+     cannot be edited from a browser and is the record an auditor would be shown. Thirty-one
+     PPMAudit.record() call sites were removed then, and the three functions above were deleted
+     from PPMAudit at the same time.
+
+     This module was missed. It went on calling all three - through a local alias, `const log =
+     audit()`, which is why the retired-identifier gate did not see it: the gate looked for the
+     string "PPMAudit.compareAndRecord" and the code said "log.compareAndRecord".
+
+     WHAT THAT COST
+
+     Every save that recorded a change threw TypeError at the point of recording, after the row
+     had reached the database. The throw killed the rest of the handler, so the modal stayed
+     open, the list never re-rendered and no message appeared - on resources, milestones,
+     programmes, benefits and project details. The data was saved. It looked like a dead button,
+     which is the least likely symptom to be reported as "the audit trail is broken".
+
+     The reading half below is untouched and still used: the History button on a record, and the
+     Audit History page's location labels.
   */
-  function trackCollection(options) {
-    const settings = options || {};
-    const log = audit();
-    if (!log) return 0;
-
-    const idField = settings.idField || "id";
-    const before = asMap(settings.before, idField);
-    const after = Array.isArray(settings.after) ? settings.after : [];
-    const only = settings.only instanceof Set ? settings.only : null;
-    const entityType = settings.entityType || "Record";
-    const known = LOCATIONS[entityType] || {};
-    const location = settings.location || known.label || entityType;
-    const statusField = settings.statusField || "";
-    const labels = settings.labels || {};
-    const nameOf =
-      settings.name || ((row) => String((row && (row.name || row.title)) || row?.[idField] || "Record"));
-    let recorded = 0;
-
-    const seen = new Set();
-
-    after.forEach((row) => {
-      const id = String(row?.[idField] || "");
-      if (!id) return;
-      seen.add(id);
-      if (only && !only.has(id) && !only.has(row[idField])) return;
-      const previous = before.get(id) || null;
-      const label = nameOf(row);
-      const created = !previous;
-      const entry = log.compareAndRecord(previous, row, {
-        projectCode: resolve(settings.projectCode, row) || "",
-        entityType,
-        entityId: id,
-        location,
-        action: created
-          ? labels.created || `${entityType} created`
-          : labels.updated || `${entityType} updated`,
-        summary: created ? `${label} was added in ${location}.` : `${label} was updated in ${location}.`,
-        fields: settings.fields,
-        statusFrom: statusField ? serialise(previous?.[statusField]) : "",
-        statusTo: statusField ? serialise(row[statusField]) : "",
-        metadata: resolve(settings.metadata, row) || {},
-        always: created
-      });
-      if (entry) recorded += 1;
-    });
-
-    before.forEach((row, id) => {
-      if (seen.has(id)) return;
-      if (only && !only.has(id)) return;
-      const label = nameOf(row);
-      log.record({
-        projectCode: resolve(settings.projectCode, row) || "",
-        entityType,
-        entityId: id,
-        location,
-        action: labels.deleted || `${entityType} deleted`,
-        summary: `${label} was deleted from ${location}.`,
-        changes: log.diff(row, {}, settings.fields),
-        statusFrom: statusField ? serialise(row[statusField]) : "",
-        statusTo: statusField ? "Deleted" : "",
-        metadata: resolve(settings.metadata, row) || {}
-      });
-      recorded += 1;
-    });
-
-    return recorded;
-  }
-
-  // Single-record version, for modal saves rather than grid saves.
-  function recordRow(options) {
-    const settings = options || {};
-    const log = audit();
-    if (!log) return null;
-    const entityType = settings.entityType || "Record";
-    const known = LOCATIONS[entityType] || {};
-    const location = settings.location || known.label || entityType;
-    const created = !settings.before;
-    const label = settings.name || settings.entityId || "Record";
-    const statusField = settings.statusField || "";
-    return log.compareAndRecord(settings.before, settings.after, {
-      projectCode: settings.projectCode || "",
-      entityType,
-      entityId: settings.entityId || "",
-      location,
-      action: settings.action || (created ? `${entityType} created` : `${entityType} updated`),
-      summary:
-        settings.summary ||
-        (created ? `${label} was added in ${location}.` : `${label} was updated in ${location}.`),
-      fields: settings.fields,
-      statusFrom: statusField ? serialise(settings.before?.[statusField]) : "",
-      statusTo: statusField ? serialise(settings.after?.[statusField]) : "",
-      metadata: settings.metadata || {},
-      always: created || Boolean(settings.always)
-    });
-  }
-
-  function recordDeletion(options) {
-    const settings = options || {};
-    const log = audit();
-    if (!log) return null;
-    const entityType = settings.entityType || "Record";
-    const known = LOCATIONS[entityType] || {};
-    const location = settings.location || known.label || entityType;
-    const label = settings.name || settings.entityId || "Record";
-    return log.record({
-      projectCode: settings.projectCode || "",
-      entityType,
-      entityId: settings.entityId || "",
-      location,
-      action: settings.action || `${entityType} deleted`,
-      summary: settings.summary || `${label} was deleted from ${location}.`,
-      changes: log.diff(settings.before, {}, settings.fields),
-      statusFrom: settings.statusField ? serialise(settings.before?.[settings.statusField]) : "",
-      statusTo: settings.statusField ? "Deleted" : "",
-      metadata: settings.metadata || {}
-    });
-  }
 
   /* --------------------------------------------------------------- history UI */
 
@@ -558,9 +439,6 @@
     locationFor,
     areas,
     locationLabels,
-    trackCollection,
-    recordRow,
-    recordDeletion,
     historyFor,
     historyButton,
     openHistory,

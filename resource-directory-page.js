@@ -599,27 +599,16 @@ async function saveResource(event) {
   }
 
   /*
-    The PPMAuth.audit("User access changed", ...) call was here.
+    Two browser-side audit calls were here: PPMAuth.audit("User access changed", ...) and a
+    change-log entry. Both are gone.
 
-    It appended the access change to ppmAuthHistory in the browser. Three things already record
-    it and all of them outlast this page: PPMChangeLog.recordRow below, the change log the tool
-    shows; the row itself, saved a few lines above through the one write seam; and public.audit_log
-    in PostgreSQL, written by a trigger on public.people, which names the actor and is the one an
-    auditor would be shown. A fourth copy in localStorage was governance history that a reload
-    could replace, which is worse than no copy because it reads as a record.
-
-    Stage 14 removed browser-side audit emission everywhere else for the same reason. This was
-    missed.
+    PostgreSQL records this change itself. public.audit_log holds a row per change to
+    public.people, written by a trigger from the authenticated identity, which is the record an
+    auditor would actually be shown. The browser copies were weaker, could be replaced by a
+    reload, and one of them - the change-log call - had been throwing since Stage 14, taking the
+    rest of this handler with it: the resource saved, and then the modal never closed, the list
+    never refreshed and no message appeared. It looked exactly like a dead button.
   */
-  PPMChangeLog.recordRow({
-    before: existing,
-    after: existing ? { ...existing, ...resource } : resource,
-    entityType: "Resource",
-    entityId: resource.resourceId,
-    fields: RESOURCE_AUDIT_FIELDS,
-    statusField: "accountStatus",
-    name: resource.fullName
-  });
   await syncResourceReferences(resource);
   closeModal();
   populateTeamFilter();
@@ -656,15 +645,14 @@ async function toggleResource(resourceId) {
     return;
   }
 
-  PPMChangeLog.recordRow({
-    before: beforeToggle,
-    after: resource,
-    entityType: "Resource",
-    entityId: resource.resourceId,
-    fields: RESOURCE_AUDIT_FIELDS,
-    action: willActivate ? "Resource reactivated" : "Resource deactivated",
-    name: resource.fullName
-  });
+  /*
+    A PPMChangeLog recordRow call was here.
+
+    Stage 14 removed browser-side audit emission: PostgreSQL records every change itself, from the
+    authenticated identity, in public.audit_log. Thirty-one PPMAudit.record() call sites went
+    then. This module was missed, and went on calling PPMAudit.compareAndRecord() through a local
+    alias - so it threw on every save, taking the rest of the handler with it.
+  */
   renderResources();
   showMessage(`${resource.fullName} was ${willActivate ? "reactivated" : "deactivated"}.`, "success");
 }

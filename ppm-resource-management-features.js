@@ -1158,82 +1158,38 @@
     return false;
   }
 
+  /*
+    Publishing turns a scenario's demand into live demand, in one transaction.
+
+    WHAT THIS LOOKED LIKE BEFORE, AND WHY IT WAS WRONG
+
+    The Stage 17 note that used to sit here said "no fallback: the else-branch wrote rows the
+    database refuses through private.guard_resource_scenario_workflow_write, and the refusal was
+    swallowed by the write seam - so a scenario appeared published and was not". The note was
+    correct and the else-branch was still there, three copies of the guard above it, and the
+    result of the workflow call assigned to a variable nobody read.
+
+    Unreachable rather than harmful - the guard returns before it - but a comment claiming a
+    deletion that had not happened is worse than either, because the next person reads the comment.
+
+    The workflow function throws on every failure it can detect, which is why there is no result
+    to check: the catch below is the whole error path.
+  */
   async function publishScenario(id) {
-    const scenarios = PPMPlanning.getScenarios();
-    const scenario = scenarios.find((item) => item.scenarioId === id);
+    const scenario = PPMPlanning.getScenarios().find((item) => item.scenarioId === id);
     if (!scenario) return;
-    const changedDemandItems = scenarioChanges(scenario).length;
+
+    if (!databaseResourceWorkflowEnabled()) {
+      showMessage(
+        "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
+          "the page; if it persists, the database connection or your sign-in has been lost.",
+        "error"
+      );
+      return;
+    }
 
     try {
-      /*
-        Stage 17: no fallback. The else-branch wrote rows the database refuses through
-        private.guard_resource_scenario_workflow_write, and the refusal was swallowed by the
-        write seam - so a scenario appeared published and was not.
-      */
-      if (!databaseResourceWorkflowEnabled()) {
-        showMessage(
-          "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
-            "the page; if it persists, the database connection or your sign-in has been lost.",
-          "error"
-        );
-        return;
-      }
-
-      /*
-        Stage 17: no fallback. The else-branch wrote rows the database refuses through
-        private.guard_resource_scenario_workflow_write, and the refusal was swallowed by the
-        write seam - so a scenario appeared published and was not.
-      */
-      if (!databaseResourceWorkflowEnabled()) {
-        showMessage(
-          "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
-            "the page; if it persists, the database connection or your sign-in has been lost.",
-          "error"
-        );
-        return;
-      }
-
-      /*
-        Stage 17: no fallback. The else-branch wrote rows the database refuses through
-        private.guard_resource_scenario_workflow_write, and the refusal was swallowed by the
-        write seam - so a scenario appeared published and was not.
-      */
-      if (!databaseResourceWorkflowEnabled()) {
-        showMessage(
-          "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
-            "the page; if it persists, the database connection or your sign-in has been lost.",
-          "error"
-        );
-        return;
-      }
-
-      if (databaseResourceWorkflowEnabled()) {
-        const result = await PPMChildDatabase.commitResourceScenarioWorkflow({
-          operation: "publish",
-          scenario
-        });
-        const published = PPMPlanning.getScenarios().find((item) => item.scenarioId === id) || scenario;
-
-      } else {
-        const now = new Date().toISOString();
-        if (
-          !(await saved(
-            PPMPlanning.saveDemand(
-              (scenario.demands || []).map((item) => ({ ...item, updatedAt: now, scenarioPublishedFrom: id }))
-            )
-          ))
-        )
-          return;
-        scenario.status = "Published";
-        scenario.publishedAt = now;
-        scenario.updatedAt = now;
-        scenario.audit = [
-          ...(scenario.audit || []),
-          { action: "Published to live demand", at: now, by: "Resource planning team" }
-        ];
-        if (!(await saved(PPMPlanning.saveScenarios(scenarios)))) return;
-
-      }
+      await PPMChildDatabase.commitResourceScenarioWorkflow({ operation: "publish", scenario });
       renderScenarios();
       renderDemand();
       showMessage("The resource scenario was published successfully.", "success");
@@ -1242,30 +1198,22 @@
     }
   }
 
+  /* Rejecting is the same shape: one transactional call, no local fallback. */
   async function rejectScenario(id) {
-    const scenarios = PPMPlanning.getScenarios();
-    const scenario = scenarios.find((item) => item.scenarioId === id);
+    const scenario = PPMPlanning.getScenarios().find((item) => item.scenarioId === id);
     if (!scenario) return;
+
+    if (!databaseResourceWorkflowEnabled()) {
+      showMessage(
+        "The resource scenario workflow is unavailable, so this cannot be recorded. Reload " +
+          "the page; if it persists, the database connection or your sign-in has been lost.",
+        "error"
+      );
+      return;
+    }
+
     try {
-      if (databaseResourceWorkflowEnabled()) {
-        await PPMChildDatabase.commitResourceScenarioWorkflow({
-          operation: "reject",
-          scenario
-        });
-        const rejected = PPMPlanning.getScenarios().find((item) => item.scenarioId === id) || scenario;
-
-      } else {
-        const now = new Date().toISOString();
-        scenario.status = "Rejected";
-        scenario.rejectedAt = now;
-        scenario.updatedAt = now;
-        scenario.audit = [
-          ...(scenario.audit || []),
-          { action: "Rejected", at: now, by: "Resource planning team" }
-        ];
-        if (!(await saved(PPMPlanning.saveScenarios(scenarios)))) return;
-
-      }
+      await PPMChildDatabase.commitResourceScenarioWorkflow({ operation: "reject", scenario });
       renderScenarios();
       showMessage("The resource scenario was rejected.", "success");
     } catch (error) {
