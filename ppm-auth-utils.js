@@ -1002,6 +1002,55 @@
   // interactive — the .add-row-button inside it is the control that matters.
   const CONTROL_SELECTOR = "button, a.button, .add-row-button, [role='button']";
 
+  /*
+    The regions of the page this application owns.
+
+    THIS EXISTS BECAUSE THE GUARD WAS REACHING OUTSIDE ITS OWN APPLICATION
+
+    applyControlPermissions() used to query the whole document. A browser extension that injects
+    interactive UI into the page - a sidebar, a recorder, a toolbar - therefore had its buttons
+    scanned too, and any of them whose label happened to contain "edit", "delete", "save" and so
+    on was found to be an untagged mutation control and DISABLED. The user's own extension stopped
+    working, on this site only, for no reason they could see. It also logged a warning naming
+    controls that do not exist in this codebase, which is worse than useless: it is a false report
+    of a defect, and it buries the real ones.
+
+    So the scan is scoped. Everything below is either shipped markup or injected by this
+    application; nothing else on the page is any of our business. VERIFY-STATIC gate 6h checks
+    that every control in every shipped page sits inside one of these, so adding a new kind of
+    top-level dialogue without listing it here fails the build rather than silently leaving its
+    buttons unguarded.
+  */
+  const APP_REGIONS = [
+    "header",
+    "nav",
+    "main",
+    ".modal-background",
+    ".confirmation-background",
+    ".action-modal-background",
+    ".dialog-background",
+    ".config-modal-background",
+    ".modal",
+    ".shell",
+    ".nf-wrap",
+    ".ppm-session-bar"
+  ].join(", ");
+
+  /*
+    Every control this application owns, de-duplicated.
+
+    A Set because the regions nest - .modal sits inside .modal-background on most pages - and a
+    control inside both would otherwise be visited twice. Visiting twice is harmless for the
+    disabling itself, but it would double-count in the untagged report.
+  */
+  function ownControls() {
+    const found = new Set();
+    document.querySelectorAll(APP_REGIONS).forEach((region) => {
+      region.querySelectorAll(CONTROL_SELECTOR).forEach((element) => found.add(element));
+    });
+    return found;
+  }
+
   function isMutationControl(element) {
     if (element?.closest?.(".ppm-notification-centre")) return false;
     if (element?.closest?.(".ppm-history-modal")) return false;
@@ -1065,7 +1114,7 @@
       if (element.dataset.permission === NOT_A_MUTATION) return;
       if (!can(element.dataset.permission, projectCode)) element.dataset.ppmPermissionHidden = "true";
     });
-    document.querySelectorAll(CONTROL_SELECTOR).forEach((element) => {
+    ownControls().forEach((element) => {
       if (!isMutationControl(element)) return;
       const required = actionPermission(element);
       if (required === NOT_A_MUTATION) return;
