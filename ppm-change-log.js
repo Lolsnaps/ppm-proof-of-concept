@@ -285,19 +285,50 @@
 
   /* --------------------------------------------------------------- history UI */
 
-  function historyFor(entityType, entityId) {
-    const log = audit();
-    if (!log) return [];
+  /*
+    Everything recorded against one record, newest first.
+
+    Two sources, deliberately merged rather than one replacing the other:
+
+      the database   public.audit_log, written by trigger from the authenticated identity.
+                     Everything since the migration, and the only trustworthy half.
+      legacyAudit    browser rows recorded before Stage 14 stopped emitting them. Real history
+                     that happened; it simply cannot be verified.
+
+    This used to read only the second, which is why the History button showed "0 recorded
+    changes" on a record somebody had just edited - the browser rows stop in August and nothing
+    has been added to them since. It was honest and increasingly empty, which reads as "nothing
+    ever happened here" rather than "I am looking in the wrong place".
+
+    Asynchronous, because the database is. openHistory() awaits it.
+  */
+  async function historyFor(entityType, entityId) {
     const type = String(entityType || "").toLowerCase();
     const id = String(entityId || "").toLowerCase();
-    return log
-      .read()
-      .filter(
-        (row) =>
-          String(row.entityType || "").toLowerCase() === type &&
-          String(row.entityId || "").toLowerCase() === id
-      )
-      .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+
+    const legacy = audit()
+      ? audit()
+          .read()
+          .filter(
+            (row) =>
+              String(row.entityType || "").toLowerCase() === type &&
+              String(row.entityId || "").toLowerCase() === id
+          )
+      : [];
+
+    let recorded = [];
+    try {
+      if (window.PPMDatabase?.getAuditTrail) {
+        recorded = await PPMDatabase.getAuditTrail({ recordEndsWith: entityId, limit: 200 });
+        recorded = recorded.filter((row) => String(row.entityId || "").toLowerCase() === id);
+      }
+    } catch (error) {
+      console.warn("PPMChangeLog: the database audit trail could not be read.", error);
+    }
+
+    return [...recorded, ...legacy].sort((a, b) =>
+      String(b.timestamp).localeCompare(String(a.timestamp))
+    );
   }
 
   const escapeHtml = PPMCore.escapeHtml;
@@ -373,10 +404,19 @@
       .join("")}</tbody></table>`;
   }
 
-  function openHistory(entityType, entityId, name) {
+  async function openHistory(entityType, entityId, name) {
     ensureShell();
-    const entries = historyFor(entityType, entityId);
     const known = LOCATIONS[entityType] || {};
+    /* Shown while the database is asked. Reading a trail is a network call now, and a dialogue
+       that sits blank for a moment reads as "no history" - which is the exact wrong answer. */
+    document.getElementById("ppmHistoryTitle").textContent = name || entityId || "Change history";
+    document.getElementById("ppmHistorySubtitle").textContent = `${entityType} · ${entityId}`;
+    document.getElementById("ppmHistoryBody").innerHTML =
+      '<div class="ppm-history-empty">Loading the recorded history…</div>';
+    document.getElementById("ppmHistoryModal").classList.add("visible");
+    document.body.style.overflow = "hidden";
+
+    const entries = await historyFor(entityType, entityId);
     document.getElementById("ppmHistoryTitle").textContent = name || entityId || "Change history";
     document.getElementById("ppmHistorySubtitle").textContent =
       `${entityType} · ${entityId} · ${entries.length} recorded change${entries.length === 1 ? "" : "s"} in ${known.label || entityType}`;
@@ -397,10 +437,7 @@
         </article>`
           )
           .join("")
-      : '<div class="ppm-history-empty">No changes have been recorded against this record yet. History starts from the first edit saved after change tracking was enabled.</div>';
-
-    document.getElementById("ppmHistoryModal").classList.add("visible");
-    document.body.style.overflow = "hidden";
+      : '<div class="ppm-history-empty">No changes have been recorded against this record yet.</div>';
   }
 
   function closeHistory() {

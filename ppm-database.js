@@ -848,6 +848,12 @@
         .limit(Number(options?.limit) || 500);
 
       if (options?.recordKey) request = request.eq("record_key", options.recordKey);
+      /*
+        The audit key is composite - "PRJ-00011 / DEC-00011-001" - because a record id is only
+        unique within its project. A caller that has the record id and not the project, which is
+        every per-record History button, matches on the tail instead.
+      */
+      if (options?.recordEndsWith) request = request.like("record_key", `%${options.recordEndsWith}`);
       if (options?.table) request = request.eq("table_name", options.table);
 
       const { data, error } = await request;
