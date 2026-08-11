@@ -119,6 +119,15 @@
     so. The fix is usually to give them the role that can - a person may hold several - which
     is what this message points at.
   */
+  /*
+    Added to a notification when the person is being asked for something their role cannot do, so
+    the answer is "ask an administrator" rather than a button that does nothing.
+
+    Only use it where the role genuinely still decides. Stage 18 made being named as a required
+    approver on a stage gate the authority in its own right, so saying it there would send
+    somebody to an administrator to fix a problem they do not have - which is the same shape of
+    misdirection as the message that blamed the account for a Draft gate.
+  */
   function blockedNote(canAct, whatToDo) {
     return canAct ? "" : ` \u00b7 Your access roles cannot ${whatToDo} - ask an administrator`;
   }
@@ -366,14 +375,19 @@
           approver.decision !== "Approved" &&
           !selfApproval
         ) {
-          const canApproveGate = PPMAuth.can("stageGates.approve", gate.projectCode);
+          /*
+            Stage 18: no blockedNote here. Being named as a required approver is the authority to
+            decide this gate, whatever the person's role - so the note would have been wrong, and
+            it was: an Executive / Steering User named as an approver was told their access roles
+            could not approve stage gates, on the notification asking them to approve one.
+          */
           add({
             id: stableId(["formal-gate-approval", gate.gateId, gate.workflowStatus, gate.updatedAt]),
             category: "approval",
             severity: "high",
             title: "Stage gate awaiting your decision",
             detail: `${gate.gateName || gate.gateId} Â· ${projectLabel(gate.projectCode)}`,
-            meta: `${gate.currentStage || "Current stage"} to ${gate.proposedNextStage || "no stage progression"} \u00b7 Independent approval${blockedNote(canApproveGate, "approve stage gates")}`,
+            meta: `${gate.currentStage || "Current stage"} to ${gate.proposedNextStage || "no stage progression"} \u00b7 Independent approval`,
             href,
             projectCode: gate.projectCode,
             entityId: gate.gateId,
