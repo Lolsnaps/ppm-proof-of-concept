@@ -154,8 +154,16 @@
     );
   }
 
+  /*
+    Which notifications this person has dismissed, on this computer.
+
+    Browser state, in localStorage, and read directly so that is obvious. It briefly went through
+    raw() when the reads were migrated to PPMStore - raw() takes a collection name, STATE_KEY is a
+    storage key, and PPMStore["ppmNotificationState"] is undefined, so every page load threw
+    before the notification bell could render.
+  */
   function stateFor(resourceId) {
-    const store = raw(STATE_KEY, {});
+    const store = PPMCore.readJson(STATE_KEY, {});
     const state =
       store && typeof store === "object" && store[resourceId] && typeof store[resourceId] === "object"
         ? store[resourceId]
@@ -166,7 +174,7 @@
     };
   }
   function saveState(resourceId, state) {
-    const store = raw(STATE_KEY, {});
+    const store = PPMCore.readJson(STATE_KEY, {});
     const next = store && typeof store === "object" && !Array.isArray(store) ? store : {};
     const cutoff = Date.now() - 120 * DAY_MS;
     const read = Object.fromEntries(

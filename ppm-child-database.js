@@ -3011,12 +3011,17 @@
     const gateId = String(gate.gateId || "").trim();
     if (!gateId) throw new Error("The stage-gate workflow has no gate identifier.");
 
-    /* A Draft may have been saved milliseconds before Submit. Child write-through
-       updates the adapter baseline when that save completes, but deliberately does
-       not mutate the caller's already-serialised local object. Flush first, then
-       use the baseline version this browser most recently loaded/saved. This keeps
-       optimistic locking real without creating a false self-conflict. */
-    await Promise.all(STAGE_GATE_WORKFLOW_MODULES.map((name) => flush(name)));
+    /*
+      A Draft may have been saved milliseconds before Submit, so the version to send is the one
+      the adapter's baseline holds rather than the one on the caller's already-serialised object.
+      baselineRecord() answers that.
+
+      Five `await flush(...)` calls used to sit here and in the other three workflows, waiting for
+      the write-through queue to drain. The queue and flush() were deleted with the write-through;
+      this call was missed, and threw "flush is not defined" the first time somebody approved a
+      gate. Every write is awaited by its own caller now, so there is nothing left to wait for -
+      the record has already reached the database or already failed.
+    */
     const gatePrior = baselineRecord("stageGates", gate);
     const expectedGateVersion = Number(gatePrior?.version ?? request.expectedGateVersion ?? gate.databaseVersion);
     if (!Number.isFinite(expectedGateVersion))
