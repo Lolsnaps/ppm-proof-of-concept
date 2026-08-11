@@ -576,7 +576,7 @@
         ok: false,
         rows: [],
         error: new Error(
-          "Multi-factor verification is not complete, so the database returns no rows. Keeping the last known local data."
+          "Multi-factor verification is not complete, so the database returns no rows and nothing can be loaded."
         )
       };
     }
@@ -1522,17 +1522,33 @@
     if (!modules.length) return report;
 
     /*
+      Signed out is a state, not a fault.
+
+      Every page loads this adapter, including the sign-in page and whatever page is showing at
+      the moment somebody signs out. Without this, each collection was queried, each was refused
+      for want of a session, and each logged a warning - describing the entirely correct outcome
+      of pressing "sign out" as a fault, in a stack of 36 across both adapters.
+
+      Reported at info rather than warn, because nothing has gone wrong.
+    */
+    if (!(await session())) {
+      modules.forEach((name) => report.skipped.push({ module: name, reason: "nobody is signed in" }));
+      console.info("PPMDatabase: nobody is signed in, so there is nothing to load.");
+      return report;
+    }
+
+    /*
       Asked once here rather than left to the per-module guard in query(). Below aal2
       every module would fail for the same reason, and 4 identical warnings followed by
       32 more from the child adapter buries the one line that explains the page.
     */
-    if ((await session()) && (await assuranceLevel()) !== "aal2") {
+    if ((await assuranceLevel()) !== "aal2") {
       modules.forEach((name) =>
         report.skipped.push({ module: name, reason: "multi-factor verification is not complete" })
       );
       console.warn(
         "PPMDatabase: not refreshing from the database - multi-factor verification is not complete, so it would " +
-          "return no rows and empty every collection. Showing the last known local data instead."
+          "return no rows and empty every collection. Nothing is loaded until it is."
       );
       return report;
     }
@@ -1594,7 +1610,11 @@
       if (!result.ok) {
         report.failed.push({ module: name, error: String(result.error?.message || result.error) });
         console.warn(
-          `PPMDatabase: could not load "${name}" from the database. The page is showing the last known local data.`,
+          /* Stage 17 deleted the localStorage mirror, so there is no "last known local data" to
+             fall back on and there has not been for some time. The collection is empty and the
+             page will show nothing. Saying otherwise was reassuring and wrong. */
+          `PPMDatabase: could not load "${name}" from the database, so it is empty and the page ` +
+            `will show nothing for it. Reload once the connection is back.`,
           result.error
         );
         continue;

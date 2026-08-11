@@ -1957,7 +1957,7 @@
         ok: false,
         rows: [],
         error: new Error(
-          "Multi-factor verification is not complete, so the database returns no rows. Keeping the last known local data."
+          "Multi-factor verification is not complete, so the database returns no rows and nothing can be loaded."
         )
       };
 
@@ -2434,15 +2434,34 @@
   async function hydrate() {
     const report = { hydrated: [], skipped: [], failed: [] };
 
+    /*
+      Signed out is a state, not a fault.
+
+      Every page loads the adapters, including the sign-in page and whatever page is showing at
+      the moment somebody signs out. Without this, each of the 32 collections was queried, each
+      was refused for want of a session, and each logged its own warning - 32 of them, plus four
+      from the parent adapter, describing the entirely correct outcome of pressing "sign out".
+
+      It is reported at info rather than warn for the same reason: nothing has gone wrong. Once,
+      because saying it 32 times does not make it more true.
+    */
+    if (!(await session())) {
+      activeModules().forEach((moduleName) =>
+        report.skipped.push({ module: moduleName, reason: "nobody is signed in" })
+      );
+      console.info("PPMChildDatabase: nobody is signed in, so there is nothing to load.");
+      return report;
+    }
+
     /* One warning for all 32 collections rather than 32 saying the same thing.
        See the note in queryRows(). */
-    if ((await session()) && (await assuranceLevel()) !== "aal2") {
+    if ((await assuranceLevel()) !== "aal2") {
       activeModules().forEach((moduleName) =>
         report.skipped.push({ module: moduleName, reason: "multi-factor verification is not complete" })
       );
       console.warn(
         "PPMChildDatabase: not refreshing any collection - multi-factor verification is not complete, so the " +
-          "database would return no rows and empty all of them. Showing the last known local data instead."
+          "database would return no rows and empty all of them. Nothing is loaded until it is."
       );
       return report;
     }
@@ -2452,7 +2471,9 @@
       if (!result.ok) {
         report.failed.push(result);
         console.warn(
-          `PPMChildDatabase: could not load "${moduleName}" from the database. The page is using the last local copy.`,
+          /* There is no local copy. The mirror went in Stage 17 - this collection is empty. */
+          `PPMChildDatabase: could not load "${moduleName}" from the database, so it is empty and ` +
+            `the page will show nothing for it. Reload once the connection is back.`,
           result.error
         );
       } else if (result.skipped) report.skipped.push(result);
@@ -3497,7 +3518,13 @@
   async function boot() {
     if (!activeModules().length) return { hydrated: [], skipped: [], failed: [] };
     return hydrate().catch((error) => {
-      console.error("PPMChildDatabase: hydration failed; the page is using the last local child data.", error);
+      /* There is no local child data to fall back on - Stage 17 deleted the mirror. Nothing
+         loaded, so every register on this page will be empty. */
+      console.error(
+        "PPMChildDatabase: hydration failed, so no project records loaded and the page will be empty. " +
+          "Reload once the connection is back.",
+        error
+      );
       return { hydrated: [], skipped: [], failed: [{ module: "all", error: String(error) }] };
     });
   }
