@@ -1,0 +1,47 @@
+# Portfolio Manager — private source repository
+#
+# This repository is PRIVATE and holds everything: the application, the migrations, the
+# documentation, the test harness and the build tooling.
+#
+# The hosted site is served from a SEPARATE PUBLIC repository, which receives only the
+# files a browser actually asks for. That copy is built into deploy/ by
+#
+#     node BUILD-DEPLOY-SET.mjs --sync deploy
+#
+# and pushed from there. Nothing explanatory reaches it, because nothing explanatory is in
+# the set it copies.
+#
+# So the rule here is no longer "keep the design out" — it is only, and still,
+# NEVER COMMIT PORTFOLIO DATA. Real project, people and financial records do not belong in
+# any repository, private or otherwise.
+
+# Backups and exports contain real project, people and financial records.
+portfolio-manager-backup-*.json
+portfolio-manager-audit-archive-*.json
+*-backup-*.json
+*.dump
+*.sql.gz
+
+# Database dumps
+supabase/.branches/
+supabase/.temp/
+
+# Full-build archives. The repo IS the build; a committed ZIP is a stale duplicate.
+PPM-Tool-*.zip
+*.zip
+
+# The public working copy lives OUTSIDE this folder, at ..\ppm-proof-of-concept, because
+# GitHub Desktop refuses to manage a repository nested inside another one. This rule stays
+# for the old location: if anything ever writes deploy\ in here again, it must not be
+# committed - two copies of the application in one repository defeats the split.
+deploy/
+
+# Office lock files, created while a workbook is open.
+.~lock.*#
+~$*
+
+# Local scratch
+localhost.txt
+.DS_Store
+Thumbs.db
+node_modules/

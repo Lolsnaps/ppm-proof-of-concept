@@ -1,0 +1,200 @@
+/*
+  Layout for PREVIEW-CONTROLS.html only. Not part of the application, and not in the deploy
+  set - the preview page is excluded from the crawl, so nothing it references ships.
+
+  Deliberately plain: everything interesting on that page should come from ppm-controls.css,
+  so that what you are looking at is the real thing and not a mock-up of it.
+*/
+
+body {
+  margin: 0;
+  padding: 28px 26px 60px;
+  background: #f4f6fa;
+  color: #172033;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+h1 {
+  margin: 0 0 6px;
+  color: #3f1937;
+  font-size: 22px;
+}
+
+.lede {
+  max-width: 760px;
+  margin: 0 0 24px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 18px;
+  align-items: start;
+  max-width: 1180px;
+}
+
+.card {
+  padding: 16px 18px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.card.wide {
+  grid-column: 1 / -1;
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  color: #5b294f;
+  font-size: 14px;
+}
+
+.card p.note {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.field {
+  margin-bottom: 13px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 5px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tick-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+
+/* --- scrollbar demonstrations --- */
+
+.scroll-v {
+  height: 150px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow-y: auto;
+  background: #fbfcfe;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.scroll-h {
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow-x: auto;
+  background: #fbfcfe;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.scroll-both {
+  max-height: 190px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: auto;
+  background: #fff;
+}
+
+.scroll-both table {
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.scroll-both th,
+.scroll-both td {
+  padding: 7px 12px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+}
+
+.scroll-both th {
+  position: sticky;
+  top: 0;
+  background: #fbfcfe;
+  color: #475569;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* --- before and after --- */
+
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.compare h3 {
+  margin: 0 0 3px;
+  font-size: 12px;
+}
+
+.compare .before h3 {
+  color: #991b1b;
+}
+
+.compare .after h3 {
+  color: #166534;
+}
+
+.compare p {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.compare select[multiple] {
+  width: 100%;
+}
+
+.footnote {
+  max-width: 900px;
+  margin: 26px 0 0;
+  padding: 14px 16px;
+  border-left: 4px solid #5b294f;
+  border-radius: 8px;
+  background: #faf5ff;
+  color: #3f1937;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.footnote b {
+  font-weight: 800;
+}

@@ -1,0 +1,12 @@
+# Line-ending policy for the public deploy repository.
+#
+# GENERATED - this file is copied in as .gitattributes by BUILD-DEPLOY-SET.mjs.
+#
+# -text means "never convert". The deploy folder is a copy of files that already exist, byte
+# for byte, and the public repository should hold exactly those bytes.
+#
+# Without this, git applies whatever line-ending policy the machine happens to be configured
+# with. A file identical to its source then shows as every line changed, so a one-line CSS
+# tweak arrives as a 56-line diff and nobody can see what actually changed. Worse, the bytes
+# that reach the live site depend on how git felt like checking them out.
+* -text

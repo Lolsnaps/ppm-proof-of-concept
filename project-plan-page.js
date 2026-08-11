@@ -47,18 +47,20 @@ const escapeHtml = PPMCore.escapeHtml;
 */
 const styleAttr = PPMCore.styleAttribute;
 function readProjects() {
-  const rows = PPMPlanning.read("ppmProjects", []);
+  const rows = PPMPlanning.read("projects", []);
   return Array.isArray(rows) ? rows : [];
 }
 function readPlans() {
-  const value = PPMPlanning.read("ppmProjectPlans", {});
+  const value = PPMPlanning.read("plans", {});
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
-function savePlans() {
-  if (projectArchived) return;
+async function savePlans() {
+  if (projectArchived) {
+    return { ok: false, reason: "denied", message: "Archived projects are read-only." };
+  }
   const store = readPlans();
   store[projectCode] = tasks;
-  PPMPlanning.write("ppmProjectPlans", store);
+  return PPMPlanning.write("plans", store);
 }
 function showMessage(text, type = "success") {
   const box = document.getElementById("pageMessage");
@@ -611,7 +613,11 @@ async function savePlan() {
     if (dirtyIds.has(task.taskId)) task.updatedAt = now;
     task.createdAt = task.createdAt || now;
   });
-  savePlans();
+  const planResult = await savePlans();
+  if (planResult && planResult.ok === false) {
+    showMessage(planResult.message || "The project plan could not be saved.", "error");
+    return;
+  }
   const demandSync = await syncLinkedDemandDates();
   const demandDatesChanged = demandSync.changed;
   if (!demandSync.ok) {
@@ -664,7 +670,7 @@ function externalItemOptions(projectId, type, selected) {
   if (type === "Project")
     return `<option value="${escapeHtml(projectId)}" selected>${escapeHtml(projectId)}</option>`;
   if (type === "Milestone") {
-    const store = PPMPlanning.read("ppmProjectMilestones", {});
+    const store = PPMPlanning.read("milestones", {});
     return (
       '<option value="">Select milestone</option>' +
       (store[projectId] || [])
@@ -855,7 +861,11 @@ async function submitBaselineDecision(event) {
       if (databaseWorkflow) {
         // Legacy approval also saved the current plan. Preserve that behaviour,
         // then let the RPC snapshot the exact PostgreSQL plan versions we just saved.
-        savePlans();
+        const planResult = await savePlans();
+        if (planResult && planResult.ok === false) {
+          showMessage(planResult.message || "The project plan could not be saved before baseline approval.", "error");
+          return;
+        }
         const result = await PPMChildDatabase.commitBaselineWorkflow({
           operation: "approve_initial",
           projectCode,
@@ -873,7 +883,11 @@ async function submitBaselineDecision(event) {
           return;
         }
         entityId = `BASELINE-v${baseline.record.version}`;
-        savePlans();
+        const planResult = await savePlans();
+        if (planResult && planResult.ok === false) {
+          showMessage(planResult.message || "The project plan could not be saved.", "error");
+          return;
+        }
       }
     } else {
       const requestId = document.getElementById("baselineRequestId").value,
@@ -885,7 +899,11 @@ async function submitBaselineDecision(event) {
         if (action === "approveRequest") {
           // Preserve any ordinary plan edits already made in this browser before
           // the database applies the approved baseline dates atomically.
-          savePlans();
+          const planResult = await savePlans();
+          if (planResult && planResult.ok === false) {
+            showMessage(planResult.message || "The project plan could not be saved before rebaseline approval.", "error");
+            return;
+          }
         }
         await PPMChildDatabase.commitBaselineWorkflow({
           operation: action === "approveRequest" ? "approve_request" : "reject_request",
@@ -903,7 +921,11 @@ async function submitBaselineDecision(event) {
               task.baselineEndDate = proposed.baselineEndDate;
             }
           });
-          savePlans();
+          const planResult = await savePlans();
+          if (planResult && planResult.ok === false) {
+            showMessage(planResult.message || "The project plan could not be saved.", "error");
+            return;
+          }
           const approved = await PPMPlanning.createApprovedBaseline(projectCode, tasks, {
             ...decision,
             reason: request.reason,

@@ -62,7 +62,13 @@
     better than a thrown error taking the rest of the script with it.
   */
   function read(collection, fallback) {
-    return window.PPMStore ? window.PPMStore[collection].read() : fallback;
+    if (!window.PPMStore) return fallback;
+    const namespace = window.PPMStore[collection];
+    if (!namespace || typeof namespace.read !== "function") {
+      console.error(`PPMPlanning: "${collection}" is not a registered PPMStore collection.`);
+      return fallback;
+    }
+    return namespace.read();
   }
 
   /*
@@ -83,7 +89,18 @@
         value
       };
     }
-    const result = await window.PPMStore.replaceAll(collection, value);
+    const namespace = window.PPMStore[collection];
+    if (!namespace || typeof namespace.replaceAll !== "function") {
+      console.error(`PPMPlanning: "${collection}" is not a registered PPMStore collection.`);
+      return {
+        ok: false,
+        reason: "invalid",
+        message: `The planning collection "${collection}" is not registered, so nothing was saved.`,
+        queued: false,
+        value
+      };
+    }
+    const result = await namespace.replaceAll(value);
     return { ...result, value };
   }
 

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<title>Controls preview | PPM Tool</title>
+<!--
+  A preview, not a page of the application.
+
+  It exists so a visual change can be looked at on its own, away from live data - and so the
+  before and after can sit side by side, which they cannot in the application itself.
+
+  It links the real stylesheet and the real script rather than copies of them, so what you see
+  here is exactly what the pages do. Open it by double-clicking.
+
+  It is excluded from the deploy crawl (NOT_THE_APP in BUILD-DEPLOY-SET.mjs) and from the
+  app-page checks (NON_APP_PAGES in VERIFY-STATIC.mjs), so it stays on this machine. The two
+  files it demonstrates DO ship - they are linked by the pages themselves.
+-->
+<link rel="stylesheet" href="ppm-controls.css?v=2026.08.11.37">
+<link rel="stylesheet" href="PREVIEW-CONTROLS.css?v=2026.08.11.37">
+</head>
+<body>
+
+<h1>Scrollbars and controls &mdash; preview</h1>
+<p class="lede">
+  This is the real stylesheet and the real script, as the application now loads them. Scroll the
+  boxes below with the pointer outside them, then move it in: the plum should be faint until you
+  approach, firmer on the bar itself, firmest while you drag.
+</p>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>1. Vertical</h2>
+    <p class="note">The everyday case &mdash; a list taller than its box.</p>
+    <div class="scroll-v">
+      Programme review &mdash; February<br>
+      Benefits realisation workshop<br>
+      Stage gate 2 &mdash; readiness check<br>
+      Supplier onboarding<br>
+      Data migration dry run<br>
+      Business readiness assessment<br>
+      Training material sign-off<br>
+      Go-live rehearsal<br>
+      Post-implementation review<br>
+      Lessons learned session<br>
+      Benefits baseline refresh<br>
+      Financial year-end close<br>
+      Resource plan reforecast<br>
+      RAID log review<br>
+      Steering committee pack
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Horizontal</h2>
+    <p class="note">The one that looked worst on the project plan.</p>
+    <div class="scroll-h">
+      Task&nbsp;ID &nbsp;&bull;&nbsp; Task name &nbsp;&bull;&nbsp; Owner &nbsp;&bull;&nbsp;
+      Planned start &nbsp;&bull;&nbsp; Planned finish &nbsp;&bull;&nbsp; Forecast start
+      &nbsp;&bull;&nbsp; Forecast finish &nbsp;&bull;&nbsp; Percentage complete
+      &nbsp;&bull;&nbsp; Predecessor &nbsp;&bull;&nbsp; Slippage &nbsp;&bull;&nbsp; RAG
+      &nbsp;&bull;&nbsp; Stage &nbsp;&bull;&nbsp; Contributors &nbsp;&bull;&nbsp; Notes
+    </div>
+  </div>
+
+  <div class="card wide">
+    <h2>3. Both at once, with a sticky header</h2>
+    <p class="note">
+      A register, which is where both bars appear together. The square where they meet used to
+      be grey; it is transparent now.
+    </p>
+    <div class="scroll-both">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th><th>Project</th><th>Manager</th><th>Status</th><th>Overall RAG</th>
+            <th>Forecast start</th><th>Forecast end</th><th>Complete</th><th>Stage</th>
+            <th>Programme</th><th>Portfolio</th><th>Budget</th><th>Spend to date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>PRJ-001</td><td>Customer portal replacement</td><td>A Townsend</td><td>Active</td><td>Green</td><td>01 Apr 2026</td><td>28 Nov 2026</td><td>42%</td><td>Delivery</td><td>Digital</td><td>Transformation</td><td>&pound;1,240,000</td><td>&pound;517,300</td></tr>
+          <tr><td>PRJ-002</td><td>Finance system upgrade</td><td>R Patel</td><td>Active</td><td>Amber</td><td>12 Jan 2026</td><td>30 Sep 2026</td><td>68%</td><td>Delivery</td><td>Corporate</td><td>Transformation</td><td>&pound;860,000</td><td>&pound;602,900</td></tr>
+          <tr><td>PRJ-003</td><td>Depot network consolidation</td><td>S Okafor</td><td>On Hold</td><td>Red</td><td>03 Mar 2026</td><td>19 Feb 2027</td><td>11%</td><td>Definition</td><td>Operations</td><td>Estates</td><td>&pound;3,100,000</td><td>&pound;288,000</td></tr>
+          <tr><td>PRJ-004</td><td>Records retention programme</td><td>M Idowu</td><td>Planned</td><td>Not Assessed</td><td>01 Sep 2026</td><td>31 Mar 2027</td><td>0%</td><td>Concept</td><td>Corporate</td><td>Compliance</td><td>&pound;410,000</td><td>&pound;0</td></tr>
+          <tr><td>PRJ-005</td><td>Field mobility rollout</td><td>C Nkemelu</td><td>Active</td><td>Green</td><td>18 Feb 2026</td><td>14 Aug 2026</td><td>81%</td><td>Delivery</td><td>Operations</td><td>Digital</td><td>&pound;735,000</td><td>&pound;588,000</td></tr>
+          <tr><td>PRJ-006</td><td>Data warehouse migration</td><td>A Townsend</td><td>Active</td><td>Amber</td><td>06 Jan 2026</td><td>22 Dec 2026</td><td>34%</td><td>Delivery</td><td>Digital</td><td>Transformation</td><td>&pound;1,980,000</td><td>&pound;701,450</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4. Text, dates and numbers</h2>
+    <p class="note">
+      Hover any field, then click into it. One shape, one focus ring, plum rather than blue.
+    </p>
+    <div class="field">
+      <label for="p-name">Project name</label>
+      <input id="p-name" type="text" value="Customer portal replacement">
+    </div>
+    <div class="field">
+      <label for="p-note">Current status and next steps</label>
+      <textarea id="p-note" rows="3">Discovery closed on schedule. Next: supplier selection paper to the February board.</textarea>
+    </div>
+    <div class="pair">
+      <div class="field">
+        <label for="p-start">Proposed Start Date</label>
+        <input id="p-start" type="date" value="2026-04-01">
+      </div>
+      <div class="field">
+        <label for="p-pct">Percentage Complete</label>
+        <input id="p-pct" type="number" value="42" min="0" max="100">
+      </div>
+    </div>
+    <div class="field">
+      <label for="p-empty">Empty, with placeholder</label>
+      <input id="p-empty" type="text" placeholder="Not yet recorded">
+    </div>
+    <div class="field">
+      <label for="p-off">Disabled &mdash; how a field you may not edit reads</label>
+      <input id="p-off" type="text" value="Set by the approver" disabled>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>5. Dropdowns and tick boxes</h2>
+    <p class="note">
+      The closed box is themed and the arrow is drawn. The list it opens is Chrome's and cannot
+      be styled &mdash; that is a limitation of the browser, not a loose end.
+    </p>
+    <div class="field">
+      <label for="p-status">Project Status</label>
+      <select id="p-status">
+        <option>Proposed</option>
+        <option selected>Active</option>
+        <option>On Hold</option>
+        <option>Completed</option>
+        <option>Cancelled</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="p-rag">Overall RAG Status</label>
+      <select id="p-rag">
+        <option>Not Assessed</option>
+        <option selected>Green</option>
+        <option>Amber</option>
+        <option>Red</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="p-locked">Disabled dropdown</label>
+      <select id="p-locked" disabled>
+        <option>Portfolio-wide</option>
+      </select>
+    </div>
+    <label class="tick-row"><input type="checkbox" checked> Copy delivery roles</label>
+    <label class="tick-row"><input type="checkbox" checked> Copy project plan</label>
+    <label class="tick-row"><input type="checkbox"> Copy open RAID items</label>
+    <label class="tick-row"><input type="checkbox" disabled> Copy approvals (never copied)</label>
+  </div>
+
+  <div class="card wide">
+    <h2>6. Pick lists &mdash; before and after</h2>
+    <p class="note">
+      Both sides hold the same options. The left is what Administration and the Resource
+      Directory show today; the right is the same control after enhancement.
+    </p>
+    <div class="compare">
+      <div class="before">
+        <h3>Before &mdash; native multiple-select</h3>
+        <p>
+          Selection is highlight only, which is also what hover looks like. Adding a second
+          item needs Ctrl held down, and clicking without it clears everything already chosen.
+        </p>
+        <select id="before-roles" multiple size="7">
+          <option>Portfolio / PMO Manager</option>
+          <option selected>Project Sponsor / Project Lead</option>
+          <option>Project Manager</option>
+          <option selected>Executive / Steering User</option>
+          <option>Finance Business Partner</option>
+          <option>Resource Manager / Team Manager</option>
+          <option>Project Team Member</option>
+          <option>Assurance / Audit Reviewer</option>
+          <option>Read-only Stakeholder</option>
+        </select>
+      </div>
+      <div class="after">
+        <h3>After &mdash; tick boxes, same control underneath</h3>
+        <p>
+          Tick, plum text and plum tint all say the same thing. Click anywhere on a row. The
+          count is stated, and Clear cannot happen by accident.
+        </p>
+        <label for="after-roles">Additional roles</label>
+        <select id="after-roles" multiple size="7">
+          <option>Portfolio / PMO Manager</option>
+          <option selected>Project Sponsor / Project Lead</option>
+          <option>Project Manager</option>
+          <option selected>Executive / Steering User</option>
+          <option>Finance Business Partner</option>
+          <option>Resource Manager / Team Manager</option>
+          <option>Project Team Member</option>
+          <option>Assurance / Audit Reviewer</option>
+          <option>Read-only Stakeholder</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card wide">
+    <h2>7. The part that matters &mdash; the page still reads the same control</h2>
+    <p class="note">
+      The tick boxes write straight back into the hidden select. This reads it exactly the way
+      resource-directory-page.js does, on every change. If these two ever disagree, the
+      enhancement is broken.
+    </p>
+    <div class="field">
+      <label for="readback">[...select.selectedOptions].map(o =&gt; o.value)</label>
+      <textarea id="readback" rows="3" readonly></textarea>
+    </div>
+  </div>
+
+</div>
+
+<p class="footnote">
+  <b>Nothing here is live.</b> The application does not load either file yet, and the file list
+  the public repository receives is derived by following what each page asks for &mdash; so
+  neither can reach your testers until we link them, which is a one-line change per page once
+  UAT closes.
+</p>
+
+<script src="ppm-picklist.js?v=2026.08.11.37"></script>
+<script src="PREVIEW-CONTROLS.js?v=2026.08.11.37"></script>
+</body>
+</html>
