@@ -20,40 +20,26 @@
   let bellButton = null;
   let panel = null;
 
-  // Notifications are built only from records the signed-in person may see, so
-  // this reads the permission-filtered view rather than the whole store.
-  function raw(key, fallback) {
-    if (window.PPMAuth?.readScoped) return PPMAuth.readScoped(key, fallback);
-    try {
-      const value = localStorage.getItem(key);
-      return value ? JSON.parse(value) : fallback;
-    } catch (error) {
-      return fallback;
-    }
+  /*
+    Stage 16: notifications are built from PPMStore.
+
+    They are still built only from records the signed-in person may see, and that is now true for
+    a better reason. This used to call PPMAuth.readScoped, whose filtering was a client-side
+    convenience layered over the localStorage mirror. The store holds whatever RLS allowed this
+    person to load, so the scoping is the database's and cannot be talked out of.
+
+    rows() replaces the local flattenStore: all() already unpacks the project-keyed shape and
+    fills in a row's project code or programme id from the key it is filed under.
+  */
+  function raw(collection, fallback) {
+    if (!window.PPMStore) return fallback;
+    const value = PPMStore[collection].read();
+    return value === null || value === undefined ? fallback : value;
   }
 
-  function flattenStore(store) {
-    if (Array.isArray(store)) return store.filter(Boolean);
-    if (!store || typeof store !== "object") return [];
-    return Object.entries(store).flatMap(([group, rows]) =>
-      Array.isArray(rows)
-        ? rows.filter(Boolean).map((row) => ({
-            ...row,
-            projectCode: row.projectCode || row.projectId || (/^(programme:|__)/i.test(group) ? "" : group),
-            programmeId: row.programmeId || (group.startsWith("programme:") ? group.slice(10) : "")
-          }))
-        : []
-    );
+  function rows(collection) {
+    return window.PPMStore ? PPMStore[collection].all() : [];
   }
-  function flattenProgrammeStore(store) {
-    if (!store || typeof store !== "object" || Array.isArray(store)) return [];
-    return Object.entries(store).flatMap(([programmeId, rows]) =>
-      Array.isArray(rows)
-        ? rows.filter(Boolean).map((row) => ({ ...row, programmeId: row.programmeId || programmeId }))
-        : []
-    );
-  }
-
   function normalise(value) {
     return String(value || "")
       .trim()
@@ -189,8 +175,16 @@
       )
     );
     next[resourceId] = { read, updatedAt: new Date().toISOString() };
-    if (window.PPMAuth?.writeScoped) PPMAuth.writeScoped(STATE_KEY, next);
-    else localStorage.setItem(STATE_KEY, JSON.stringify(next));
+    /*
+      Which notifications this person has dismissed, on this computer. There is no table for it
+      and it is not portfolio data, so localStorage is the right home and it says so plainly.
+
+      It used to prefer PPMAuth.writeScoped, whose name promised a permission-filtered write.
+      That filter went with the prototype patch in Stage 16 - the function is now an ordinary
+      localStorage write with a misleading name, and going through it hid the fact that this is
+      browser state rather than something the database keeps.
+    */
+    localStorage.setItem(STATE_KEY, JSON.stringify(next));
   }
 
   function notificationBuilder(user, scopedCodes, projectMap) {
@@ -216,7 +210,7 @@
 
     // Explicitly assigned budget approvals and recent outcomes for their requestors.
     if (PPMAuth.can("financials.viewDetail"))
-      flattenStore(raw("ppmFinancialApprovalRequests", {})).forEach((approval) => {
+      rows("financialApprovals").forEach((approval) => {
         if (!canUseProject(approval.projectCode)) return;
         if (
           approval.status === "Pending Approval" &&
@@ -259,8 +253,7 @@
 
     // Plan baselines requiring an authorised independent approver.
     if (PPMAuth.can("plan.view")) {
-      const requestStore = raw("ppmPlanBaselineRequests", {});
-      flattenStore(requestStore).forEach((request) => {
+      rows("baselineRequests").forEach((request) => {
         if (
           !canUseProject(request.projectCode) ||
           request.status !== "Requested" ||
@@ -281,8 +274,8 @@
           eventDate: request.createdAt
         });
       });
-      const baselines = raw("ppmPlanBaselines", {});
-      const plans = raw("ppmProjectPlans", {});
+      const baselines = raw("planBaselines", {});
+      const plans = raw("plans", {});
       scopedCodes.forEach((code) => {
         const project = projectMap.get(code);
         const tasks = Array.isArray(plans?.[code]) ? plans[code] : [];
@@ -310,7 +303,7 @@
 
     // Formal lifecycle gates: independent decisions, outcomes and scheduled meetings.
     if (PPMAuth.can("stageGates.view"))
-      flattenStore(raw("ppmStageGates", {})).forEach((gate) => {
+      rows("stageGates").forEach((gate) => {
         if (!canUseProject(gate.projectCode)) return;
         const project = projectMap.get(gate.projectCode);
         if (!activeProject(project)) return;
@@ -462,7 +455,7 @@
 
     // Overdue and due-today plan work, owned by the signed-in person.
     if (PPMAuth.can("plan.view"))
-      flattenStore(raw("ppmProjectPlans", {})).forEach((task) => {
+      rows("plans").forEach((task) => {
         if (
           !canUseProject(task.projectCode) ||
           !activeProject(projectMap.get(task.projectCode)) ||
@@ -493,7 +486,7 @@
 
     // RAID review periods, escalation and target dates.
     if (PPMAuth.can("raid.view"))
-      flattenStore(raw("ppmProjectRaid", {})).forEach((raid) => {
+      rows("raid").forEach((raid) => {
         if (
           !canUseProject(raid.projectCode) ||
           CLOSED_RAID_STATUSES.has(raid.status) ||
@@ -533,7 +526,7 @@
 
     // Accountable actions and decision-owner approvals.
     if (PPMAuth.can("registers.view")) {
-      flattenStore(raw("ppmProjectActions", {})).forEach((action) => {
+      rows("actions").forEach((action) => {
         if (
           !canUseProject(action.projectCode) ||
           CLOSED_ACTION_STATUSES.has(action.status) ||
@@ -569,7 +562,7 @@
           dueDate: action.dueDate
         });
       });
-      flattenStore(raw("ppmProjectDecisions", {})).forEach((decision) => {
+      rows("decisions").forEach((decision) => {
         if (
           !canUseProject(decision.projectCode) ||
           !["Required", "Under Review"].includes(decision.status) ||
@@ -594,7 +587,7 @@
 
     // Benefits owned by the user: scheduled reviews and target realisation.
     if (PPMAuth.can("benefits.view"))
-      flattenStore(raw("ppmProjectBenefits", {})).forEach((benefit) => {
+      rows("benefits").forEach((benefit) => {
         if (benefit.projectCode && !canUseProject(benefit.projectCode)) return;
         if (
           !assignedTo(benefit, "owner", user) ||
@@ -642,7 +635,7 @@
 
     // Milestones and project stage gates.
     if (PPMAuth.can("milestones.view"))
-      flattenStore(raw("ppmProjectMilestones", {})).forEach((milestone) => {
+      rows("milestones").forEach((milestone) => {
         if (
           !canUseProject(milestone.projectCode) ||
           !activeProject(projectMap.get(milestone.projectCode)) ||
@@ -736,7 +729,7 @@
 
     // Status reports and governed documents.
     if (PPMAuth.can("registers.view")) {
-      flattenStore(raw("ppmStatusReports", {})).forEach((report) => {
+      rows("statusReports").forEach((report) => {
         if (!canUseProject(report.projectCode)) return;
         const project = projectMap.get(report.projectCode);
         if (report.status === "Submitted" && projectApprover(project, user))
@@ -789,7 +782,7 @@
             eventDate: report.updatedAt
           });
       });
-      flattenStore(raw("ppmProjectDocuments", {})).forEach((documentRecord) => {
+      rows("documents").forEach((documentRecord) => {
         if (!canUseProject(documentRecord.projectCode)) return;
         const project = projectMap.get(documentRecord.projectCode);
         const href = `registers.html?tab=documents&item=${encodeURIComponent(documentRecord.documentId)}`;
@@ -857,11 +850,11 @@
 
     // Resource requests, requester outcomes, critical unfilled demand and absence review.
     if (PPMAuth.can("resourceManagement.view")) {
-      const resources = raw("ppmResources", []);
+      const resources = raw("people", []);
       const resourceMap = new Map(
         (Array.isArray(resources) ? resources : []).map((resource) => [resource.resourceId, resource])
       );
-      flattenStore(raw("ppmResourceDemand", [])).forEach((demand) => {
+      rows("resourceDemand").forEach((demand) => {
         if (demand.projectCode && !canUseProject(demand.projectCode)) return;
         const href = `resource-management.html?view=demand&item=${encodeURIComponent(demand.demandId)}`;
         if (
@@ -928,7 +921,7 @@
       });
       /* Whoever manages a team, whatever else they are. */
       if (PPMAuth.holdsPermission(user, "resources.manageTeam") && user.team)
-        flattenStore(raw("ppmResourceAbsence", [])).forEach((absence) => {
+        rows("resourceAbsence").forEach((absence) => {
           const person = resourceMap.get(absence.resourceId);
           if (absence.status !== "Proposed" || normalise(person?.team) !== normalise(user.team)) return;
           add({
@@ -948,11 +941,11 @@
 
     // Programme-level milestones and RAID items assigned directly to the user.
     if (PPMAuth.can("programmes.view")) {
-      const programmes = raw("ppmProgrammes", []);
+      const programmes = raw("programmes", []);
       const programmeMap = new Map(
         (Array.isArray(programmes) ? programmes : []).map((programme) => [programme.programmeId, programme])
       );
-      flattenProgrammeStore(raw("ppmProgrammeRaid", {})).forEach((raid) => {
+      rows("programmeRaid").forEach((raid) => {
         if (!assignedTo(raid, "owner", user) || CLOSED_RAID_STATUSES.has(raid.status)) return;
         const days = daysUntil(raid.targetDate);
         if (days === null || days > 0) return;
@@ -969,7 +962,7 @@
           dueDate: raid.targetDate
         });
       });
-      flattenProgrammeStore(raw("ppmProgrammeMilestones", {})).forEach((milestone) => {
+      rows("programmeMilestones").forEach((milestone) => {
         if (
           !assignedTo(milestone, "owner", user) ||
           Number(milestone.percentageComplete || 0) >= 100 ||
@@ -1013,7 +1006,7 @@
   function getNotifications() {
     const user = window.PPMAuth?.getCurrentUser?.();
     if (!user) return [];
-    const rawProjects = raw("ppmProjects", []);
+    const rawProjects = raw("projects", []);
     const projects = PPMAuth.filterProjects(Array.isArray(rawProjects) ? rawProjects : []);
     const projectMap = new Map(projects.map((project) => [project.projectCode, project]));
     return notificationBuilder(user, new Set(projectMap.keys()), projectMap);
@@ -1185,6 +1178,10 @@
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) refresh();
     });
+    /* "storage" fires when another tab writes localStorage. Notifications are built from
+       PPMStore now, which no tab writes, so this cannot fire for portfolio data - it is kept
+       only because the dismissed-notification state below genuinely does live in localStorage
+       and is worth picking up from a second tab. */
     window.addEventListener("storage", refresh);
     setInterval(refresh, 60000);
   }

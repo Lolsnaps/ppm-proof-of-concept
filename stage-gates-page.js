@@ -111,8 +111,9 @@ function approverMarkup(gate) {
   return `<div class="approver-list">${gate.requiredApprovers.map((person) => `<strong>${escapeHtml(person.name || person.resourceId)}</strong><span>${person.decision ? `${escapeHtml(person.decision)}${person.decidedAt ? ` · ${new Date(person.decidedAt).toLocaleDateString("en-GB")}` : ""}` : "Awaiting decision"}</span>`).join("")}</div>`;
 }
 function loadData() {
-  const rawProjects = PPMAuth.readScoped("ppmProjects", []);
-  projects = PPMAuth.filterProjects(Array.isArray(rawProjects) ? rawProjects : [], PPMAuth.getCurrentUser());
+  /* Stage 16: from PPMStore. filterProjects stays - it applies this person's own project-access
+     list, which is narrower than what RLS already returned. */
+  projects = PPMAuth.filterProjects(PPMStore.projects.all(), PPMAuth.getCurrentUser());
   resources = PPMResources.ensureLegacyResources().filter(
     (item) => item.active !== false && item.resourceKind !== "Generic placeholder"
   );

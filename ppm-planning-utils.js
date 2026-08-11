@@ -1,15 +1,23 @@
 (function () {
   "use strict";
 
+  /*
+    Stage 16: collections, not storage keys.
+
+    These were the eight localStorage keys this module read and wrote. They are now the names of
+    the collections themselves, which is what both PPMStore and the two adapters call them, so
+    there is one vocabulary rather than a translation in the middle. Section 2g of
+    VERIFY-STATIC.mjs checks every name here against the adapters' own registries.
+  */
   const KEYS = {
-    baselines: "ppmPlanBaselines",
-    baselineRequests: "ppmPlanBaselineRequests",
-    ragHistory: "ppmRagHistory",
-    ragConfig: "ppmRagConfig",
-    demand: "ppmResourceDemand",
-    absence: "ppmResourceAbsence",
-    scenarios: "ppmResourceScenarios",
-    resourceConfig: "ppmResourceConfig"
+    baselines: "planBaselines",
+    baselineRequests: "baselineRequests",
+    ragHistory: "ragHistory",
+    ragConfig: "ragConfig",
+    demand: "resourceDemand",
+    absence: "resourceAbsence",
+    scenarios: "resourceScenarios",
+    resourceConfig: "resourceConfig"
   };
 
   const DEFAULT_RAG_CONFIG = {
@@ -47,10 +55,14 @@
     ["operationalReadiness", "Operational readiness"]
   ];
 
-  const parseJson = (value, fallback) => PPMCore.parseJson(value, fallback, "planning data");
-
-  function read(key, fallback) {
-    return parseJson(localStorage.getItem(key), fallback);
+  /*
+    Stage 16: reads come from PPMStore, which holds what PostgreSQL confirmed, rather than from
+    the localStorage mirror the adapters used to hydrate. The fallback survives for the one case
+    it was ever really for - a page where the data layer failed to load, where an empty list is
+    better than a thrown error taking the rest of the script with it.
+  */
+  function read(collection, fallback) {
+    return window.PPMStore ? window.PPMStore[collection].read() : fallback;
   }
 
   /*
@@ -59,10 +71,9 @@
     Was localStorage.setItem, which reached PostgreSQL only because both adapters had replaced
     Storage.prototype.setItem, and which returned before the database had been asked anything.
 
-    The collection is looked up from the key rather than mapped by hand, so the eight stores
-    below need no list here that could go stale.
+    Named collections rather than storage keys, so nothing has to be translated on the way in.
   */
-  async function write(key, value) {
+  async function write(collection, value) {
     if (!window.PPMStore) {
       return {
         ok: false,
@@ -71,10 +82,6 @@
         queued: false,
         value
       };
-    }
-    const collection = window.PPMStore.collectionFor(key);
-    if (!collection) {
-      return { ok: false, reason: "invalid", message: `No collection is registered for "${key}".`, queued: false, value };
     }
     const result = await window.PPMStore.replaceAll(collection, value);
     return { ...result, value };
@@ -643,7 +650,7 @@
   function calculateProjectRags(project, options) {
     const settings = options || {};
     const config = getRagConfig();
-    const plans = settings.plans || read("ppmProjectPlans", {});
+    const plans = settings.plans || read("plans", {});
     const tasks = normalisePlan(Array.isArray(plans[project.projectCode]) ? plans[project.projectCode] : []);
     calculateCriticalPath(tasks);
     const slipped = tasks
@@ -679,7 +686,7 @@
           : "Green"
         : "Not Assessed";
 
-    const raidStore = settings.raid || read("ppmProjectRaid", {});
+    const raidStore = settings.raid || read("raid", {});
     const raid = Array.isArray(raidStore[project.projectCode]) ? raidStore[project.projectCode] : [];
     const openRaid = raid.filter((item) => item.status !== "Closed");
     const risk = !raid.length
@@ -759,10 +766,12 @@
     So do not add an edit or delete path here. If a status was reported wrongly,
     the correction is a new snapshot, which is also what leaves an honest trail.
 
-    read/write below go through the patched localStorage, which is the scoped
-    view — a user limited to certain projects reads and writes only those
-    projects' history, and the merge on save preserves the projects they cannot
-    see. Keep it that way; a raw global write here would discard hidden history.
+    Stage 16 made the scoping honest rather than clever. It used to rely on the patched
+    localStorage handing back a filtered view, so that a user limited to certain projects read
+    and wrote only those projects' history and the merge on save preserved what they could not
+    see. Now the store holds whatever RLS let this person load, and the write is row by row:
+    history belonging to projects they cannot see is not read, not written, and therefore cannot
+    be discarded by anything happening here.
   */
   async function recordRagHistory(projectCode, calculated, reported, justifications, recordedBy) {
     const store = read(KEYS.ragHistory, {});
@@ -881,7 +890,6 @@
   }
 
   window.PPMPlanning = {
-    KEYS,
     RAG_DIMENSIONS,
     DEFAULT_RAG_CONFIG,
     DEFAULT_RESOURCE_CONFIG,

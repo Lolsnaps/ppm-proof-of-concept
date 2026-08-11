@@ -110,8 +110,7 @@ const BENEFIT_AUDIT_FIELDS = [
 ];
 function loadData() {
   programmes = PPMGovernance.getProgrammes();
-  const stored = PPMRegisters.readJson("ppmProjects", []);
-  projects = Array.isArray(stored) ? stored : [];
+  projects = PPMStore.projects.all();
   benefits = PPMRegisters.readRecords("benefits").map(normaliseBenefit);
   originalBenefits = new Map(
     benefits.map((record) => [record.benefitId, JSON.parse(JSON.stringify(record))])

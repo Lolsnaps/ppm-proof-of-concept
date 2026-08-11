@@ -84,28 +84,11 @@ const dependencyFieldIds = [
 ];
 
 function getProjects() {
-  const storedProjects = localStorage.getItem("ppmProjects");
-  if (!storedProjects) return [];
-
-  try {
-    const parsed = JSON.parse(storedProjects);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error("Projects could not be loaded.", error);
-    return [];
-  }
+  return PPMStore.projects.all();
 }
 
 function getRaidStore() {
-  const storedRaid = localStorage.getItem(RAID_STORAGE_KEY);
-  if (!storedRaid) return {};
-
-  try {
-    return normaliseRaidStore(JSON.parse(storedRaid));
-  } catch (error) {
-    console.error("RAID items could not be loaded.", error);
-    return {};
-  }
+  return normaliseRaidStore(PPMStore.raid.read());
 }
 
 function normaliseRaidStore(value) {
@@ -136,8 +119,21 @@ function addNormalisedItem(store, item, fallbackProjectId) {
   store[projectId].push({ ...item, projectId });
 }
 
-function saveRaidStore() {
-  localStorage.setItem(RAID_STORAGE_KEY, JSON.stringify(raidStore));
+/*
+  Stage 16: RAID items are saved through the one write seam, and the answer is shown.
+
+  This was localStorage.setItem, which reached PostgreSQL only because both adapters had
+  replaced Storage.prototype.setItem. Removing that patch left this line writing to the browser
+  and nowhere else - the page said the change was saved, the database never heard about it, and
+  the next hydration put the database's version back. The file was excused from the write-seam
+  ratchet as "UI state only", which it is not: RAID is one of the collections the tool exists to
+  keep.
+*/
+async function saveRaidStore() {
+  const saved = await PPMStore.raid.replaceAll(raidStore);
+  if (saved.ok) return true;
+  showMessage(saved.message, saved.queued ? "warning" : "error");
+  return false;
 }
 
 function getAllRaidItems() {
@@ -624,7 +620,7 @@ function validateInlineRaidItems() {
   return true;
 }
 
-function saveInlineRaidChanges() {
+async function saveInlineRaidChanges() {
   if (!hasUnsavedRaidChanges) return;
   if (!validateInlineRaidItems()) return;
   const now = new Date().toISOString();
@@ -640,7 +636,7 @@ function saveInlineRaidChanges() {
   });
 
   rebuildRaidStoreByProject();
-  saveRaidStore();
+  if (!(await saveRaidStore())) return;
   /* Stage 14: browser-side audit emission removed; the database records RAID
      changes and closures itself. The in-record auditHistory built above is a
      different thing - it is part of the RAID record the user reads. */
@@ -954,7 +950,7 @@ function saveRaidItem(event) {
   showMessage(`${item.raidId} was updated. Select Save changes to confirm.`, "success");
 }
 
-function reopenRaidItem(raidId) {
+async function reopenRaidItem(raidId) {
   const item = findRaidItem(raidId);
   if (!item) return;
   if (isArchivedProject(item.projectId)) {
@@ -973,7 +969,7 @@ function reopenRaidItem(raidId) {
     summary: `Status: ${previousStatus} to Open; item reopened after recurrence`
   });
 
-  saveRaidStore();
+  if (!(await saveRaidStore())) return;
 
   renderRaidItems();
   showMessage(`${raidId} was reopened.`, "success");

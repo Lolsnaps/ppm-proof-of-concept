@@ -1,13 +1,14 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "ppmAuditHistory";
+  /*
+    Stage 16: the history comes from PPMStore rather than the localStorage mirror.
 
-  const readJson = (key, fallback) => PPMCore.readJson(key, fallback);
-
+    legacyAudit is read-only - historical rows from before the migration, with no write path at
+    all - so this is the one collection where reading was always the whole story.
+  */
   function read() {
-    const rows = readJson(STORAGE_KEY, []);
-    return Array.isArray(rows) ? rows.filter(Boolean) : [];
+    return window.PPMStore ? window.PPMStore.legacyAudit.all() : [];
   }
 
   function currentActor(explicitActor) {
@@ -178,8 +179,6 @@
     thing is to keep showing them, clearly labelled, rather than quietly drop them.
   */
   window.PPMAudit = {
-    storageKey: STORAGE_KEY,
-
     // reads
     read,
     readVerified,

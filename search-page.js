@@ -1,6 +1,5 @@
 "use strict";
-const VIEW_KEY = "ppmSearchViews",
-  RECENT_KEY = "ppmRecentSearches";
+const RECENT_KEY = "ppmRecentSearches";
 const columns = [
   { key: "type", label: "Record type" },
   { key: "recordId", label: "Record ID" },
@@ -33,13 +32,16 @@ let projects = [],
   indexRows = [],
   visibleColumns = new Set(columns.map((column) => column.key)),
   pendingDeleteViewId = "";
-function read(key, fallback) {
-  return PPMRegisters.readJson(key, fallback);
+/*
+  Stage 16: the search index is built from PPMStore rather than from the localStorage mirror.
+
+  all() flattens the project-keyed collections and fills in a row's project code from the key it
+  is filed under, which is what PPMRegisters.flattenStore used to do here.
+*/
+function rowsOf(collection) {
+  return PPMStore ? PPMStore[collection].all() : [];
 }
 const escapeHtml = PPMCore.escapeHtml;
-function flatten(key) {
-  return PPMRegisters.flattenStore(read(key, {}));
-}
 function projectByCode(code) {
   return projects.find(
     (project) => String(project.projectCode).toLowerCase() === String(code || "").toLowerCase()
@@ -106,8 +108,8 @@ function result(
   };
 }
 function loadData() {
-  const stored = read("ppmProjects", []),
-    storedProgrammes = read("ppmProgrammes", []);
+  const stored = rowsOf("projects"),
+    storedProgrammes = rowsOf("programmes");
   projects = Array.isArray(stored) ? stored : [];
   programmes = Array.isArray(storedProgrammes) ? storedProgrammes : [];
   const rows = [];
@@ -147,7 +149,7 @@ function loadData() {
     )
   );
   if (PPMAuth.can("portfolios.view"))
-    (Array.isArray(read("ppmPortfolios", [])) ? read("ppmPortfolios", []) : []).forEach((item) =>
+    (Array.isArray(rowsOf("portfolios")) ? rowsOf("portfolios") : []).forEach((item) =>
       rows.push(
         result(
           "Portfolio",
@@ -172,7 +174,7 @@ function loadData() {
       )
     );
   if (PPMAuth.can("administration.view"))
-    (Array.isArray(read("ppmLifecycleTemplates", [])) ? read("ppmLifecycleTemplates", []) : []).forEach(
+    (Array.isArray(rowsOf("lifecycleTemplates")) ? rowsOf("lifecycleTemplates") : []).forEach(
       (item) =>
         rows.push(
           result(
@@ -193,7 +195,7 @@ function loadData() {
           )
         )
     );
-  flatten("ppmStageGates").forEach((item) =>
+  rowsOf("stageGates").forEach((item) =>
     rows.push(
       result(
         "Stage gate",
@@ -229,7 +231,7 @@ function loadData() {
       )
     )
   );
-  flatten("ppmProjectMilestones").forEach((item) =>
+  rowsOf("milestones").forEach((item) =>
     rows.push(
       result(
         "Milestone",
@@ -246,7 +248,7 @@ function loadData() {
       )
     )
   );
-  flatten("ppmProjectRaid").forEach((item) =>
+  rowsOf("raid").forEach((item) =>
     rows.push(
       result(
         "RAID",
@@ -263,7 +265,7 @@ function loadData() {
       )
     )
   );
-  flatten("ppmProjectActions").forEach((item) =>
+  rowsOf("actions").forEach((item) =>
     rows.push(
       result(
         "Action",
@@ -280,7 +282,7 @@ function loadData() {
       )
     )
   );
-  flatten("ppmProjectDecisions").forEach((item) =>
+  rowsOf("decisions").forEach((item) =>
     rows.push(
       result(
         "Decision",
@@ -297,7 +299,7 @@ function loadData() {
       )
     )
   );
-  flatten("ppmProjectBenefits").forEach((item) => {
+  rowsOf("benefits").forEach((item) => {
     const row = result(
         "Benefit",
         item.benefitId,
@@ -325,7 +327,7 @@ function loadData() {
     row.searchText = `${row.searchText} ${row.programmeName}`.trim().toLowerCase();
     rows.push(row);
   });
-  flatten("ppmProjectDocuments").forEach((item) =>
+  rowsOf("documents").forEach((item) =>
     rows.push(
       result(
         "Document",
@@ -342,7 +344,7 @@ function loadData() {
       )
     )
   );
-  flatten("ppmFinancialEntries").forEach((item) =>
+  rowsOf("financialEntries").forEach((item) =>
     rows.push(
       result(
         "Financial entry",
@@ -359,7 +361,7 @@ function loadData() {
       )
     )
   );
-  flatten("ppmFinancialApprovalRequests").forEach((item) =>
+  rowsOf("financialApprovals").forEach((item) =>
     rows.push(
       result(
         "Budget approval",
@@ -489,8 +491,10 @@ function renderColumns() {
     })
   );
 }
+/* Recent searches are per-person, per-browser scratch. No table, no collection - localStorage
+   is the right home for them and they are read directly so it is obvious that it is. */
 function recentSearches() {
-  const values = read(RECENT_KEY, []);
+  const values = PPMCore.readJson(RECENT_KEY, []);
   return Array.isArray(values) ? values : [];
 }
 function saveRecent(query) {
@@ -518,9 +522,18 @@ function renderRecent() {
     })
   );
 }
+/*
+  Stage 16: saved search views are a database collection, not browser state.
+
+  searchViews is one of the collections the child adapter owns and hydrates. This page wrote it
+  with localStorage.setItem, which reached PostgreSQL only through the prototype patch; once that
+  was removed the view was saved to the browser and nowhere else, and the next hydration replaced
+  it with the database's copy - so saving or deleting a view appeared to work and did not last.
+  The file was excused from the write-seam ratchet as "UI state only", which was true of its
+  recent searches and its column choices, and not true of this.
+*/
 function views() {
-  const values = read(VIEW_KEY, []);
-  return Array.isArray(values) ? values : [];
+  return PPMStore.searchViews.all();
 }
 function populateViews(selected = "") {
   document.getElementById("savedViewSelector").innerHTML =
@@ -555,7 +568,7 @@ function currentView(id, name) {
     updatedAt: new Date().toISOString()
   };
 }
-function saveView() {
+async function saveView() {
   const name = document.getElementById("viewName").value.trim();
   if (!name) {
     showMessage("Enter a name for this search view.", "error");
@@ -567,7 +580,11 @@ function saveView() {
     index = items.findIndex((item) => item.viewId === view.viewId);
   if (index >= 0) items[index] = view;
   else items.push(view);
-  localStorage.setItem(VIEW_KEY, JSON.stringify(items));
+  const saved = await PPMStore.searchViews.replaceAll(items);
+  if (!saved.ok) {
+    showMessage(saved.message, saved.queued ? "warning" : "error");
+    return;
+  }
   populateViews(view.viewId);
   document.getElementById("viewMeta").textContent =
     view.scope === "shared"
@@ -612,11 +629,15 @@ function closeDelete() {
   pendingDeleteViewId = "";
   document.getElementById("deleteViewConfirmation").classList.remove("visible");
 }
-function confirmDelete() {
+async function confirmDelete() {
   const id = pendingDeleteViewId,
     view = views().find((item) => item.viewId === id);
   if (!id) return;
-  localStorage.setItem(VIEW_KEY, JSON.stringify(views().filter((item) => item.viewId !== id)));
+  const saved = await PPMStore.searchViews.replaceAll(views().filter((item) => item.viewId !== id));
+  if (!saved.ok) {
+    showMessage(saved.message, saved.queued ? "warning" : "error");
+    return;
+  }
   closeDelete();
   populateViews();
   document.getElementById("viewName").value = "";

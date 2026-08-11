@@ -10,103 +10,38 @@ let projectRaidItems = [];
 let editingDocumentId = null;
 let pendingDeleteDocumentId = null;
 
+/*
+  Stage 16: everything on this page is read from PPMStore.
+
+  Each of these four was the same twenty lines - getItem, JSON.parse, a shape check, a console
+  message and a fallback - because it was reading a string out of the localStorage mirror. The
+  store returns records in the collection's registered shape, so the reading is one line and what
+  is left is only the part specific to this page.
+
+  getAllProjectRaid keeps its normalising. RAID rows are keyed by project and older rows carry
+  projectCode where newer ones carry projectId, so the grouping is rebuilt from whichever the row
+  has rather than trusted.
+*/
 function getProjects() {
-  const storedProjects = localStorage.getItem("ppmProjects");
-
-  if (!storedProjects) {
-    return [];
-  }
-
-  try {
-    const projects = JSON.parse(storedProjects);
-
-    return Array.isArray(projects) ? projects : [];
-  } catch (error) {
-    console.error("Projects could not be loaded.", error);
-
-    return [];
-  }
+  return PPMStore.projects.all();
 }
 
 function getProjectPlans() {
-  const storedPlans = localStorage.getItem("ppmProjectPlans");
-
-  if (!storedPlans) {
-    return {};
-  }
-
-  try {
-    const plans = JSON.parse(storedPlans);
-
-    if (plans && typeof plans === "object" && !Array.isArray(plans)) {
-      return plans;
-    }
-  } catch (error) {
-    console.error("Project plans could not be loaded.", error);
-  }
-
-  return {};
+  return PPMStore.plans.read();
 }
 
 function getAllProjectDocuments() {
-  const storedDocuments = localStorage.getItem("ppmProjectDocuments");
-
-  if (!storedDocuments) {
-    return {};
-  }
-
-  try {
-    const documents = JSON.parse(storedDocuments);
-
-    if (documents && typeof documents === "object" && !Array.isArray(documents)) {
-      return documents;
-    }
-  } catch (error) {
-    console.error("Project documents could not be loaded.", error);
-  }
-
-  return {};
+  return PPMStore.documents.read();
 }
 
 function getAllProjectRaid() {
-  const storedRaid = localStorage.getItem("ppmProjectRaid");
-
-  if (!storedRaid) {
-    return {};
-  }
-
-  try {
-    const parsedRaid = JSON.parse(storedRaid);
-
-    if (Array.isArray(parsedRaid)) {
-      return parsedRaid.reduce((store, item) => {
-        const itemProjectId = String(item.projectId || item.projectCode || "").trim();
-
-        if (!itemProjectId) {
-          return store;
-        }
-
-        if (!Array.isArray(store[itemProjectId])) {
-          store[itemProjectId] = [];
-        }
-
-        store[itemProjectId].push({
-          ...item,
-          projectId: itemProjectId
-        });
-
-        return store;
-      }, {});
-    }
-
-    if (parsedRaid && typeof parsedRaid === "object") {
-      return parsedRaid;
-    }
-  } catch (error) {
-    console.error("RAID items could not be loaded.", error);
-  }
-
-  return {};
+  return PPMStore.raid.all().reduce((store, item) => {
+    const itemProjectId = String(item.projectId || item.projectCode || "").trim();
+    if (!itemProjectId) return store;
+    if (!Array.isArray(store[itemProjectId])) store[itemProjectId] = [];
+    store[itemProjectId].push({ ...item, projectId: itemProjectId });
+    return store;
+  }, {});
 }
 
 function getProjectRaidItems(selectedProjectCode) {
@@ -1059,23 +994,7 @@ function configureProjectLinks() {
 }
 
 function updateMilestoneSummary() {
-  const storedMilestones = localStorage.getItem("ppmProjectMilestones");
-
-  let milestoneStore = {};
-
-  if (storedMilestones) {
-    try {
-      milestoneStore = JSON.parse(storedMilestones);
-    } catch (error) {
-      console.error("Milestones could not be loaded.", error);
-    }
-  }
-
-  if (!milestoneStore || typeof milestoneStore !== "object" || Array.isArray(milestoneStore)) {
-    milestoneStore = {};
-  }
-
-  const milestones = Array.isArray(milestoneStore[projectCode]) ? milestoneStore[projectCode] : [];
+  const milestones = PPMStore.milestones.forProject(projectCode);
 
   const overdue = milestones.filter((milestone) => milestone.status === "Overdue").length;
 

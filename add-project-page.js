@@ -265,34 +265,17 @@ async function saveRagConfigForm(event) {
   showMessage("RAG calculation thresholds were updated.", "success");
 }
 
+/*
+  Stage 16: projects come from PPMStore, and the seed is returned rather than written.
+
+  Persisting a hard-coded demo portfolio when storage was empty predates the database and is now
+  actively wrong: hydration runs before this, so an empty read means the portfolio is genuinely
+  empty or hydration was refused, and inventing projects is the last thing to do either way.
+*/
 function getProjects() {
-  const storedProjects = localStorage.getItem("ppmProjects");
-
-  if (storedProjects) {
-    try {
-      const parsedProjects = JSON.parse(storedProjects);
-
-      if (Array.isArray(parsedProjects)) {
-        return window.PPMAdmin
-          ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(parsedProjects)
-          : parsedProjects;
-      }
-    } catch (error) {
-      console.error("Projects could not be loaded.", error);
-    }
-  }
-
-  /*
-    Stage 16: the seed is returned, not written.
-
-    This used to persist a hard-coded demo portfolio whenever storage was empty. That predates
-    the database, and is now actively wrong: hydration fills storage before any page script
-    runs, so an empty read means the portfolio is genuinely empty or hydration was refused -
-    and in either case inventing projects and saving them is the last thing to do.
-  */
-  return window.PPMAdmin
-    ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(initialProjects)
-    : [...initialProjects];
+  const stored = PPMStore.projects.all();
+  const rows = stored.length ? stored : [...initialProjects];
+  return window.PPMAdmin ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(rows) : rows;
 }
 
 /* Stage 16: the one write seam. Callers must look at what comes back. */
@@ -933,10 +916,8 @@ function lifecycleMissingItems() {
   });
   if (stageLevel >= 3) {
     const projectCode = readFieldValue("projectCode");
-    const plans = JSON.parse(localStorage.getItem("ppmProjectPlans") || "{}");
-    const milestones = JSON.parse(localStorage.getItem("ppmProjectMilestones") || "{}");
-    const tasks = Array.isArray(plans[projectCode]) ? plans[projectCode] : [];
-    const projectMilestones = Array.isArray(milestones[projectCode]) ? milestones[projectCode] : [];
+    const tasks = PPMStore.plans.forProject(projectCode);
+    const projectMilestones = PPMStore.milestones.forProject(projectCode);
     if (!tasks.length) missing.push({ label: "Detailed project-plan tasks", fieldId: "" });
     if (!projectMilestones.length) missing.push({ label: "Project milestones", fieldId: "" });
     if (tasks.length && !tasks.some((task) => task.taskOwnerResourceId || task.taskOwner))

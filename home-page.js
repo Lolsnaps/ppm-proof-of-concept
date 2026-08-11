@@ -6,16 +6,12 @@ const user = PPMAuth.getCurrentUser(),
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;"),
-  flatten = (store) =>
-    Array.isArray(store)
-      ? store
-      : store && typeof store === "object"
-        ? Object.values(store).filter(Array.isArray).flat()
-        : [];
-const projects = PPMAuth.filterProjects(PPMAuth.readScoped("ppmProjects", [])),
-  plans = flatten(PPMAuth.readScoped("ppmProjectPlans", {})),
-  actions = flatten(PPMAuth.readScoped("ppmProjectActions", {}));
+      .replaceAll("'", "&#039;");
+/* Stage 16: from PPMStore, which holds what RLS allowed this person to load. filterProjects is
+   kept because it also applies the person's own project-access list, which is narrower. */
+const projects = PPMAuth.filterProjects(PPMStore.projects.all()),
+  plans = PPMStore.plans.all(),
+  actions = PPMStore.actions.all();
 const myTasks = plans.filter(
     (task) =>
       task.taskOwnerResourceId === user.resourceId &&

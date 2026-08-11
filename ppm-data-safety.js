@@ -295,6 +295,31 @@
 
     const backed = databaseBackedKeys();
 
+    /*
+      Stage 16: the portfolio itself is exported here, separately and explicitly.
+
+      Until the mirror was deleted, `data` above happened to contain every collection, because
+      hydration left a copy of each one in localStorage under its legacy key. That made a backup
+      look like a full export while being a snapshot of a cache - which is what snapshotOnly and
+      the note below exist to admit.
+
+      With the mirror gone, `data` is the seven browser-only keys and nothing else, so a backup
+      would silently stop containing the portfolio at all. Reading it from PPMStore keeps the
+      export as useful as it ever was and makes its status unambiguous: `data` is what a restore
+      writes back, `collections` is a point-in-time copy for reference, and PostgreSQL remains
+      the only place either of them can be restored to.
+    */
+    const collections = {};
+    if (window.PPMStore) {
+      window.PPMStore.collections().forEach((name) => {
+        try {
+          collections[name] = window.PPMStore[name].read();
+        } catch (error) {
+          console.error(`PPMData: "${name}" could not be included in the backup.`, error);
+        }
+      });
+    }
+
     return {
       format: BACKUP_FORMAT,
       application: "Foresters Portfolio",
@@ -317,10 +342,15 @@
           return "";
         }
       })(),
+      /* A read-only copy of the portfolio as this browser had loaded it. Restore never writes
+         these back; they are here so the file is worth keeping. */
+      collections,
+      collectionCount: Object.keys(collections).length,
       note:
         backed.size > 0
-          ? "Snapshot of a database-backed application. PostgreSQL is the authoritative copy; " +
-            "the collections listed in databaseBackedKeys cannot be restored from this file."
+          ? "Snapshot of a database-backed application. PostgreSQL is the authoritative copy. " +
+            "`data` holds the browser-only settings a restore will write back; `collections` is a " +
+            "point-in-time copy of the portfolio for reference and cannot be restored from this file."
           : "No collection was database-backed when this snapshot was taken.",
       // Kept in the file for format-1 compatibility with existing readers, but
       // now always false: backups no longer carry password material of any kind.

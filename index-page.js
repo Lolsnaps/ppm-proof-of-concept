@@ -130,54 +130,26 @@ const initialProjects = [
 
 let projects = getProjects();
 
+/*
+  Stage 16: projects come from PPMStore rather than from parsing the localStorage mirror.
+
+  The parse, the shape check and the console message all belonged to reading a string out of
+  storage. all() returns records or an empty list, so what is left here is the one thing this
+  function was actually for - bringing legacy lifecycle assignments up to date.
+
+  The seed is still returned rather than written. It used to persist a hard-coded demo portfolio
+  whenever storage was empty, which is now actively wrong: hydration runs before this, so an
+  empty read means the portfolio is genuinely empty or hydration was refused, and in either case
+  inventing projects and saving them is the last thing to do.
+*/
 function getProjects() {
-  const storedProjects = localStorage.getItem("ppmProjects");
-
-  if (storedProjects) {
-    try {
-      const parsedProjects = JSON.parse(storedProjects);
-
-      if (Array.isArray(parsedProjects)) {
-        return window.PPMAdmin
-          ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(parsedProjects)
-          : parsedProjects;
-      }
-    } catch (error) {
-      console.error("Projects could not be loaded.", error);
-    }
-  }
-
-  /*
-    Stage 16: the seed is returned, not written.
-
-    This used to persist a hard-coded demo portfolio whenever storage was empty. That predates
-    the database, and is now actively wrong: hydration fills storage before any page script
-    runs, so an empty read means the portfolio is genuinely empty or hydration was refused -
-    and in either case inventing projects and saving them is the last thing to do.
-  */
-  return window.PPMAdmin
-    ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(initialProjects)
-    : [...initialProjects];
+  const stored = PPMStore.projects.all();
+  const rows = stored.length ? stored : [...initialProjects];
+  return window.PPMAdmin ? PPMAdmin.migrateLegacyProjectLifecycleAssignments(rows) : rows;
 }
 
 function getProjectPlans() {
-  const storedPlans = localStorage.getItem("ppmProjectPlans");
-
-  if (!storedPlans) {
-    return {};
-  }
-
-  try {
-    const parsedPlans = JSON.parse(storedPlans);
-
-    if (parsedPlans && typeof parsedPlans === "object" && !Array.isArray(parsedPlans)) {
-      return parsedPlans;
-    }
-  } catch (error) {
-    console.error("Project plans could not be loaded.", error);
-  }
-
-  return {};
+  return PPMStore.plans.read();
 }
 
 /* Stage 16: the one write seam. Callers must look at what comes back. */
@@ -486,13 +458,11 @@ function nextProjectCode() {
   return `PRJ-${String(highest + 1).padStart(5, "0")}`;
 }
 
-function readObjectStore(key) {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(key) || "{}");
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch (error) {
-    return {};
-  }
+/* The project-keyed collections, in the shape they are stored in - duplicating a project copies
+   one project's group across into a new key. */
+function readObjectStore(collection) {
+  const value = PPMStore[collection].read();
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 function closeDuplicateModal() {
@@ -657,7 +627,7 @@ async function duplicateProject(event) {
 
 
   if (document.getElementById("copyPlan").checked) {
-    const plans = readObjectStore("ppmProjectPlans");
+    const plans = readObjectStore("plans");
     const tasks = Array.isArray(plans[sourceCode]) ? plans[sourceCode] : [];
     plans[newCode] = tasks.map((task, index) => ({
       ...task,
@@ -673,7 +643,7 @@ async function duplicateProject(event) {
     if (!(await savedCopy(window.PPMStore.plans.replaceAll(plans)))) return;
   }
   if (document.getElementById("copyMilestones").checked) {
-    const milestones = readObjectStore("ppmProjectMilestones");
+    const milestones = readObjectStore("milestones");
     const rows = Array.isArray(milestones[sourceCode]) ? milestones[sourceCode] : [];
     milestones[newCode] = rows.map((item, index) => ({
       ...item,
@@ -688,7 +658,7 @@ async function duplicateProject(event) {
     if (!(await savedCopy(window.PPMStore.milestones.replaceAll(milestones)))) return;
   }
   if (document.getElementById("copyOpenRaid").checked) {
-    const raid = readObjectStore("ppmProjectRaid");
+    const raid = readObjectStore("raid");
     const rows = Array.isArray(raid[sourceCode]) ? raid[sourceCode] : [];
     raid[newCode] = rows
       .filter((item) => item.status !== "Closed")
@@ -799,13 +769,19 @@ document.getElementById("archiveForm").addEventListener("submit", saveArchiveAct
 document.getElementById("closeArchiveModal").addEventListener("click", closeArchiveModal);
 document.getElementById("cancelArchive").addEventListener("click", closeArchiveModal);
 
-window.addEventListener("storage", function (event) {
-  if (event.key === "ppmProjects" || event.key === "ppmProjectPlans") {
-    projects = getProjects();
+/*
+  A "storage" listener was here. It watched for another tab writing ppmProjects or
+  ppmProjectPlans and re-rendered the register, which was how two open tabs stayed roughly in
+  step while localStorage was the shared copy.
 
-    renderProjects();
-  }
-});
+  Nothing writes those keys now, so the event cannot fire and the listener was a feature that
+  looked implemented and was not - the same shape as the governance workflows in Stage 17. It is
+  removed rather than left to read as working.
+
+  Cross-tab refresh is worth having and needs a different mechanism: hydration runs per page
+  load, so a second tab already shows the database's state when it opens, and a live update
+  would mean listening to Supabase rather than to the browser.
+*/
 
 PPMGovernance.getProgrammes();
 projects = getProjects();

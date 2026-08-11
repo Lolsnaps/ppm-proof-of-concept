@@ -63,8 +63,7 @@ function setDirty(value = true) {
   indicator.classList.toggle("dirty", value);
 }
 function loadProjects() {
-  const stored = PPMRegisters.readJson("ppmProjects", []);
-  projects = Array.isArray(stored) ? stored : [];
+  projects = PPMStore.projects.all();
   resources = PPMResources.ensureLegacyResources();
 }
 function loadRecords() {

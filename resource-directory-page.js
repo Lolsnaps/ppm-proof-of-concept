@@ -211,13 +211,18 @@ function readAdditionalRoles() {
 
 function populateProjectAccess(selectedCodes) {
   const select = document.getElementById("selectedProjectCodes");
-  const projects = PPMAuth.readGlobal(
-    "ppmProjects",
-    [],
-    "the project-access picker must list every project so an administrator can grant access to one the user cannot yet see"
-  );
+  /*
+    Stage 16: from PPMStore.
+
+    readGlobal was here for a real reason - the project-access picker must list every project, so
+    an administrator can grant somebody access to one they cannot yet see, and reading through the
+    client-side filter would have hidden exactly those. The filter is gone, so the picker now
+    lists whatever RLS returned for the administrator, which is the honest answer to the same
+    question: an administrator who cannot see a project in the database cannot grant it either.
+  */
+  const projects = PPMStore.projects.all();
   const selected = new Set(Array.isArray(selectedCodes) ? selectedCodes : []);
-  select.innerHTML = (Array.isArray(projects) ? projects : [])
+  select.innerHTML = projects
     .sort((a, b) => String(a.projectCode || "").localeCompare(String(b.projectCode || "")))
     .map(
       (project) =>
@@ -402,9 +407,9 @@ async function savedReference(promise) {
 
 async function syncResourceReferences(resource) {
   const projectFields = ["projectManager", "sponsor", "projectLead"];
-  const projects = JSON.parse(localStorage.getItem("ppmProjects") || "[]");
+  const projects = PPMStore.projects.all();
   let projectsChanged = false;
-  if (Array.isArray(projects)) {
+  {
     projects.forEach((project) =>
       projectFields.forEach((field) => {
         if (project[`${field}ResourceId`] === resource.resourceId) {
@@ -417,9 +422,9 @@ async function syncResourceReferences(resource) {
     if (projectsChanged && !(await savedReference(window.PPMStore.projects.replaceAll(projects)))) return false;
   }
 
-  const plans = JSON.parse(localStorage.getItem("ppmProjectPlans") || "{}");
+  const plans = PPMStore.plans.read();
   let plansChanged = false;
-  if (plans && typeof plans === "object" && !Array.isArray(plans)) {
+  {
     Object.values(plans)
       .filter(Array.isArray)
       .flat()
@@ -433,12 +438,8 @@ async function syncResourceReferences(resource) {
     if (plansChanged && !(await savedReference(window.PPMStore.plans.replaceAll(plans)))) return false;
   }
 
-  const raid = JSON.parse(localStorage.getItem("ppmProjectRaid") || "{}");
-  const raidItems = Array.isArray(raid)
-    ? raid
-    : raid && typeof raid === "object"
-      ? Object.values(raid).filter(Array.isArray).flat()
-      : [];
+  const raid = PPMStore.raid.read();
+  const raidItems = Object.values(raid).filter(Array.isArray).flat();
   let raidChanged = false;
   raidItems.forEach((item) => {
     [
@@ -597,42 +598,19 @@ async function saveResource(event) {
     return;
   }
 
-  if (
-    PPMAuth.can("users.manage") &&
-    (existing?.accessRole !== resource.accessRole ||
-      existing?.accountStatus !== resource.accountStatus ||
-      existing?.accessScope !== resource.accessScope ||
-      /* A second role changes what somebody can do as surely as their first one, so it
-         belongs in the access-change record. */
-      JSON.stringify(existing?.additionalRoles || []) !== JSON.stringify(resource.additionalRoles || []) ||
-      JSON.stringify(existing?.permissionOverrides || {}) !== JSON.stringify(resource.permissionOverrides))
-  ) {
-    PPMAuth.audit(
-      "User access changed",
-      resource,
-      `${resource.fullName}'s login and permissions were updated.`,
-      [
-        {
-          field: "accessRole",
-          label: "Permission level",
-          before: existing?.accessRole || "No login role",
-          after: resource.accessRole || "No login role"
-        },
-        {
-          field: "accountStatus",
-          label: "Login status",
-          before: existing?.accountStatus || "Not enabled",
-          after: resource.accountStatus || "Not enabled"
-        },
-        {
-          field: "accessScope",
-          label: "Project data scope",
-          before: existing?.accessScope || "",
-          after: resource.accessScope || ""
-        }
-      ]
-    );
-  }
+  /*
+    The PPMAuth.audit("User access changed", ...) call was here.
+
+    It appended the access change to ppmAuthHistory in the browser. Three things already record
+    it and all of them outlast this page: PPMChangeLog.recordRow below, the change log the tool
+    shows; the row itself, saved a few lines above through the one write seam; and public.audit_log
+    in PostgreSQL, written by a trigger on public.people, which names the actor and is the one an
+    auditor would be shown. A fourth copy in localStorage was governance history that a reload
+    could replace, which is worse than no copy because it reads as a record.
+
+    Stage 14 removed browser-side audit emission everywhere else for the same reason. This was
+    missed.
+  */
   PPMChangeLog.recordRow({
     before: existing,
     after: existing ? { ...existing, ...resource } : resource,

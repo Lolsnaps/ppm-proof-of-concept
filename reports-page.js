@@ -1,6 +1,5 @@
 "use strict";
 
-const VIEW_STORAGE_KEY = "ppmReportViews";
 const SESSION_STORAGE_KEY = "ppmReportSessionState";
 const DAY_MS = 86400000;
 const STALE_DAYS = 30;
@@ -45,15 +44,15 @@ let activeMetric = null;
 let visibleReportColumns = new Set();
 let currentReport = null;
 
-function parseJson(key, fallback) {
-  const value = localStorage.getItem(key);
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value);
-  } catch (error) {
-    console.error(`${key} could not be loaded.`, error);
-    return fallback;
-  }
+/*
+  Stage 16: every collection on this page is read from PPMStore.
+
+  all() flattens the project-keyed shapes and fills a row's project code or programme id from the
+  key it is filed under, which is what the local flattenStore below used to do. It is kept only
+  for the RAID collection, whose project field is projectId rather than projectCode.
+*/
+function rowsOf(collection) {
+  return PPMStore ? PPMStore[collection].all() : [];
 }
 const escapeHtml = PPMCore.escapeHtml;
 
@@ -346,24 +345,21 @@ function approvedClosureGate(project) {
   );
 }
 function loadData() {
-  projects = Array.isArray(parseJson("ppmProjects", [])) ? parseJson("ppmProjects", []) : [];
+  projects = rowsOf("projects");
   portfolios = PPMAdmin.getPortfolios();
   lifecycleTemplates = PPMAdmin.getLifecycleTemplates();
   reportingPeriods = PPMAdmin.getReportingPeriods();
   formalGates = PPMStageGates.getAll();
   resources = PPMResources.ensureLegacyResources();
-  const planStore = parseJson("ppmProjectPlans", {});
-  tasks = Object.entries(planStore && typeof planStore === "object" ? planStore : {}).flatMap(
-    ([code, items]) => (Array.isArray(items) ? items.map((item) => ({ ...item, projectCode: code })) : [])
-  );
-  milestones = flattenStore(parseJson("ppmProjectMilestones", {}));
-  raidItems = flattenStore(parseJson("ppmProjectRaid", {}), "projectId");
-  statusReports = flattenStore(parseJson("ppmStatusReports", {}));
-  actions = flattenStore(parseJson("ppmProjectActions", {}));
-  decisions = flattenStore(parseJson("ppmProjectDecisions", {}));
-  benefits = flattenStore(parseJson("ppmProjectBenefits", {}));
-  financials = flattenStore(parseJson("ppmProjectFinancials", {}));
-  documents = flattenStore(parseJson("ppmProjectDocuments", {}));
+  tasks = rowsOf("plans");
+  milestones = rowsOf("milestones");
+  raidItems = rowsOf("raid");
+  statusReports = rowsOf("statusReports");
+  actions = rowsOf("actions");
+  decisions = rowsOf("decisions");
+  benefits = rowsOf("benefits");
+  financials = rowsOf("financials");
+  documents = rowsOf("documents");
   populateFilters();
 }
 
@@ -2666,9 +2662,16 @@ function clickMetric(metricId) {
     .scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/*
+  Stage 16: saved report views are a database collection, not browser state.
+
+  reportViews is one of the collections the child adapter owns and hydrates. This page wrote it with
+  localStorage.setItem, which reached PostgreSQL only through the prototype patch; once that was
+  removed the view was saved to this browser and nowhere else, and the next hydration replaced it
+  with the database's copy - so saving or deleting a view appeared to work and did not last.
+*/
 function getSavedViews() {
-  const views = parseJson(VIEW_STORAGE_KEY, []);
-  return Array.isArray(views) ? views : [];
+  return PPMStore.reportViews.all();
 }
 function populateSavedViews(selectedId = "") {
   const selector = document.getElementById("savedViewSelector");
@@ -2688,7 +2691,7 @@ function populateSavedViews(selectedId = "") {
   selector.value = selectedId;
   document.getElementById("deleteViewButton").disabled = !selectedId;
 }
-function saveView() {
+async function saveView() {
   const name = document.getElementById("savedViewName").value.trim();
   if (!name) {
     showMessage("Enter a name for this view.", "error");
@@ -2718,7 +2721,11 @@ function saveView() {
   const index = views.findIndex((v) => v.viewId === view.viewId);
   if (index >= 0) views[index] = view;
   else views.push(view);
-  localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(views));
+  const saved = await PPMStore.reportViews.replaceAll(views);
+  if (!saved.ok) {
+    showMessage(saved.message, saved.queued ? "warning" : "error");
+    return;
+  }
   populateSavedViews(view.viewId);
   showMessage(
     `${name} was ${scope === "shared" ? "published as a shared view" : "saved as a personal view"}. Filters, sorting, visible columns and grouping were retained.`,
@@ -2744,12 +2751,16 @@ function loadView(id) {
   document.getElementById("savedViewName").value = view.name;
   renderAll();
 }
-function deleteView() {
+async function deleteView() {
   const id = document.getElementById("savedViewSelector").value;
   if (!id) return;
   const views = getSavedViews(),
     view = views.find((v) => v.viewId === id);
-  localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(views.filter((v) => v.viewId !== id)));
+  const saved = await PPMStore.reportViews.replaceAll(views.filter((v) => v.viewId !== id));
+  if (!saved.ok) {
+    showMessage(saved.message, saved.queued ? "warning" : "error");
+    return;
+  }
   populateSavedViews();
   document.getElementById("savedViewName").value = "";
   showMessage(`${view?.name || "View"} was deleted.`, "success");

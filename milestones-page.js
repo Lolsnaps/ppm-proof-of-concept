@@ -26,15 +26,14 @@ const MILESTONE_AUDIT_FIELDS = [
   { key: "notes", label: "Notes" }
 ];
 
-const parseStoredJson = (key, fallback) => PPMCore.readJson(key, fallback);
-
+/* Stage 16: from PPMStore. The milestone store keeps its project-keyed shape, because saving
+   replaces the whole collection with one project's rows changed. */
 function getProjects() {
-  const items = parseStoredJson("ppmProjects", []);
-  return Array.isArray(items) ? items : [];
+  return PPMStore.projects.all();
 }
 
 function getMilestoneStore() {
-  const store = parseStoredJson("ppmProjectMilestones", {});
+  const store = PPMStore.milestones.read();
   return store && typeof store === "object" && !Array.isArray(store) ? store : {};
 }
 

@@ -1,13 +1,6 @@
 (function () {
   "use strict";
 
-  const KEYS = {
-    summaries: "ppmProjectFinancials",
-    entries: "ppmFinancialEntries",
-    categories: "ppmFinancialCategories",
-    approvals: "ppmFinancialApprovalRequests"
-  };
-
   const DEFAULT_CATEGORIES = [
     ["CAT-0001", "Internal resource", "Internal people and delivery effort"],
     ["CAT-0002", "External resource", "Contractors and temporary resource"],
@@ -18,7 +11,18 @@
     ["CAT-0007", "Other", "Other approved project expenditure"]
   ].map(([categoryId, name, description]) => ({ categoryId, name, description, active: true, system: true }));
 
-  const readJson = (key, fallback) => PPMCore.readJson(key, fallback);
+  /*
+    Stage 16: reads come from PPMStore.
+
+    They used to come from localStorage - PPMCore.readJson("ppmFinancialEntries", {}) - which was
+    legacy mirror the adapters hydrated before the page scripts ran. Reading it worked, but it
+    meant the module was reading a copy of the data whose only guarantee was that hydration had
+    happened, and it hid which collection was being read behind a storage key.
+
+    Named collections instead. PPMStore holds what PostgreSQL confirmed, all() flattens the
+    project-keyed shape these four collections use, and a misspelt name is caught by section 2g
+    of VERIFY-STATIC.mjs rather than at run time on one page.
+  */
 
   /*
     Stage 16: the one write seam. Was localStorage.setItem, which reached PostgreSQL only via the
@@ -28,7 +32,7 @@
     replaceAll works from the collection's own registered shape, so this does not need to know
     that, and cannot get it wrong.
   */
-  async function writeJson(key, value) {
+  async function writeJson(collection, value) {
     if (!window.PPMStore) {
       return {
         ok: false,
@@ -37,10 +41,6 @@
         queued: false,
         value
       };
-    }
-    const collection = window.PPMStore.collectionFor(key);
-    if (!collection) {
-      return { ok: false, reason: "invalid", message: `No collection is registered for "${key}".`, queued: false, value };
     }
     const result = await window.PPMStore.replaceAll(collection, value);
     return { ...result, value };
@@ -52,14 +52,6 @@
   const isoToday = PPMCore.todayIso;
   function uid(prefix) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-  }
-
-  function flatten(store) {
-    if (Array.isArray(store)) return store.filter(Boolean);
-    if (!store || typeof store !== "object") return [];
-    return Object.entries(store).flatMap(([projectCode, rows]) =>
-      Array.isArray(rows) ? rows.map((row) => ({ ...row, projectCode: row.projectCode || projectCode })) : []
-    );
   }
 
   function group(rows) {
@@ -80,7 +72,7 @@
     its callers with it. backfillCategories() below is the write half, called once.
   */
   function getCategories() {
-    const stored = readJson(KEYS.categories, []);
+    const stored = PPMStore.financialCategories.read();
     if (!Array.isArray(stored) || !stored.length) return DEFAULT_CATEGORIES.map((item) => ({ ...item }));
     const names = new Set(stored.map((item) => String(item.name || "").toLowerCase()));
     return [...stored, ...DEFAULT_CATEGORIES.filter((item) => !names.has(item.name.toLowerCase()))];
@@ -88,12 +80,12 @@
 
   /* The write half: make the derived defaults permanent. Call it once, where it matters. */
   async function backfillCategories() {
-    const stored = readJson(KEYS.categories, []);
+    const stored = PPMStore.financialCategories.read();
     const derived = getCategories();
     if (Array.isArray(stored) && stored.length === derived.length) {
       return { ok: true, saved: 0, nothingToDo: true };
     }
-    return writeJson(KEYS.categories, derived);
+    return writeJson("financialCategories", derived);
   }
 
   async function saveCategories(categories) {
@@ -106,18 +98,18 @@
         system: Boolean(category.system)
       }))
       .filter((category) => category.name);
-    return writeJson(KEYS.categories, rows);
+    return writeJson("financialCategories", rows);
     return rows;
   }
 
   function getEntries(projectCode) {
-    return flatten(readJson(KEYS.entries, {})).filter(
+    return PPMStore.financialEntries.all().filter(
       (row) => !projectCode || row.projectCode === projectCode
     );
   }
 
   async function saveEntries(projectCode, entries) {
-    const all = flatten(readJson(KEYS.entries, {})).filter((row) => row.projectCode !== projectCode);
+    const all = PPMStore.financialEntries.all().filter((row) => row.projectCode !== projectCode);
     const now = new Date().toISOString();
     const rows = (Array.isArray(entries) ? entries : []).map((row) => ({
       ...row,
@@ -136,7 +128,7 @@
       createdAt: row.createdAt || now,
       updatedAt: now
     }));
-    return writeJson(KEYS.entries, group([...all, ...rows]));
+    return writeJson("financialEntries", group([...all, ...rows]));
     return rows;
   }
 
@@ -174,7 +166,7 @@
   }
 
   function getSummaries() {
-    return flatten(readJson(KEYS.summaries, {}));
+    return PPMStore.financials.all();
   }
   function getSummary(projectCode) {
     return getSummaries().find((row) => row.projectCode === projectCode) || null;
@@ -183,7 +175,7 @@
   async function saveSummary(summary) {
     const rows = getSummaries().filter((row) => row.projectCode !== summary.projectCode);
     rows.push(summary);
-    return writeJson(KEYS.summaries, group(rows));
+    return writeJson("financials", group(rows));
     return summary;
   }
 
@@ -228,13 +220,13 @@
   }
 
   function getApprovals(projectCode) {
-    return flatten(readJson(KEYS.approvals, {})).filter(
+    return PPMStore.financialApprovals.all().filter(
       (row) => !projectCode || row.projectCode === projectCode
     );
   }
 
   async function saveApprovals(rows) {
-    return writeJson(KEYS.approvals, group(rows));
+    return writeJson("financialApprovals", group(rows));
   }
 
   function databaseFinancialWorkflowEnabled() {
@@ -364,9 +356,7 @@
   }
 
   window.PPMFinancial = {
-    keys: KEYS,
     defaultCategories: DEFAULT_CATEGORIES,
-    readJson,
     getCategories,
     saveCategories,
     backfillCategories,

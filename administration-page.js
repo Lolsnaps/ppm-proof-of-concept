@@ -191,23 +191,21 @@
   }
 
   function resourceRows() {
-    const rows = PPMAuth.readGlobal(
-      "ppmResources",
-      [],
-      "administration assigns portfolio owners and sponsors from the full people directory"
-    );
-    return Array.isArray(rows)
-      ? rows.filter((row) => row && row.active !== false && row.resourceKind !== "Generic placeholder")
-      : [];
+    /*
+      Stage 16: from PPMStore.
+
+      readGlobal existed to step around PPMAuth's permission-filtered view of localStorage, and
+      administration needed the whole directory. There is no filter to step around now - the store
+      holds whatever RLS allowed this person to load - so the two paths that had to be kept in step
+      by hand are one path.
+    */
+    return PPMStore.people
+      .all()
+      .filter((row) => row.active !== false && row.resourceKind !== "Generic placeholder");
   }
 
   function programmeRows() {
-    const rows = PPMAuth.readGlobal(
-      "ppmProgrammes",
-      [],
-      "administration maintains programme-to-portfolio membership across the whole portfolio"
-    );
-    return Array.isArray(rows) ? rows.filter((row) => row && row.active !== false) : [];
+    return PPMStore.programmes.all().filter((row) => row.active !== false);
   }
 
   function fillPeopleSelect(select, selectedId) {
@@ -438,14 +436,10 @@
     if (!assertPortfolioEdit()) return;
     const row = state.portfolios.find((item) => item.portfolioId === id);
     if (!row) return;
-    const projects = PPMAuth.readGlobal(
-      "ppmProjects",
-      [],
-      "administration counts how many projects use each portfolio and lifecycle template, so it must see the whole portfolio"
-    );
-    const linked = (Array.isArray(projects) ? projects : []).filter(
-      (project) => project.portfolioId === id || (!project.portfolioId && project.portfolio === row.name)
-    ).length;
+    const linked = PPMStore.projects
+      .all()
+      .filter((project) => project.portfolioId === id || (!project.portfolioId && project.portfolio === row.name))
+      .length;
     confirmChange(
       `Retire ${row.name}?${linked ? ` ${linked} linked project${linked === 1 ? " remains" : "s remain"} visible and will retain the portfolio reference.` : ""} The record and audit history will be retained.`,
       "Retire portfolio",
@@ -852,14 +846,8 @@
       showMessage("Create another active default lifecycle before retiring this template.", "error");
       return;
     }
-    const projects = PPMAuth.readGlobal(
-      "ppmProjects",
-      [],
-      "administration counts how many projects use each portfolio and lifecycle template, so it must see the whole portfolio"
-    );
-    const linked = (Array.isArray(projects) ? projects : []).filter(
-      (project) => project.lifecycleTemplateId === row.templateId
-    ).length;
+    const linked = PPMStore.projects.all().filter((project) => project.lifecycleTemplateId === row.templateId)
+      .length;
     confirmChange(
       `Retire ${row.name}?${linked ? ` ${linked} existing project${linked === 1 ? " will" : "s will"} retain this lifecycle version.` : ""} It will no longer be offered for new projects.`,
       "Retire template",

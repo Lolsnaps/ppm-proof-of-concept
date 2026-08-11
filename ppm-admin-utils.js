@@ -1,16 +1,24 @@
 (function () {
   "use strict";
 
+  /*
+    Stage 16: collections, not storage keys - with one deliberate exception.
+
+    schemaVersion is the odd one out and stays a localStorage key, because it is not portfolio
+    data: it records which configuration migration this browser has already run. There is no
+    table for it, PPMStore would rightly refuse it, and VERIFY-STATIC.mjs lists it by name as
+    browser-only so that the exception is written down rather than assumed.
+  */
   const KEYS = Object.freeze({
-    portfolios: "ppmPortfolios",
-    lifecycleTemplates: "ppmLifecycleTemplates",
-    referenceData: "ppmReferenceData",
-    mandatoryRules: "ppmLifecycleMandatoryRules",
-    ragConfig: "ppmRagConfig",
-    reportingCalendars: "ppmReportingCalendars",
-    reportingPeriods: "ppmReportingPeriods",
-    schemaVersion: "ppmAdminSchemaVersion"
+    portfolios: "portfolios",
+    lifecycleTemplates: "lifecycleTemplates",
+    referenceData: "referenceData",
+    mandatoryRules: "lifecycleRules",
+    ragConfig: "ragConfig",
+    reportingCalendars: "reportingCalendars",
+    reportingPeriods: "reportingPeriods"
   });
+  const SCHEMA_VERSION_KEY = "ppmAdminSchemaVersion";
 
   const SCHEMA_VERSION = 2;
   const DEFAULT_STAGE_NAMES = Object.freeze([
@@ -85,30 +93,24 @@
 
   const clone = PPMCore.clone;
 
-  const parseJson = (value, fallback) => PPMCore.parseJson(value, fallback, "PPM administration data");
-
   /*
-    Administration deliberately reads and writes the unfiltered store.
+    Stage 16: reads come from PPMStore, and the "unfiltered" problem went with them.
 
-    Most keys here are configuration (portfolios, lifecycle templates, reference
-    lists, calendars) which is not project-scoped at all. The exceptions are
-    ppmProjects and ppmProgrammes, which reconcileProgrammeMembership() and
-    migrateLegacyProjectLifecycleAssignments() rewrite wholesale. Those must read
-    and write the complete list: if a project-scoped user reconciled against a
-    filtered view, saving would drop every project they cannot see.
+    This used to insist on PPMAuth.readGlobal, because administration reconciles whole
+    collections: reconcileProgrammeMembership() and migrateLegacyProjectLifecycleAssignments()
+    rewrite every project, and reading a permission-filtered view before writing the lot back
+    would have deleted every project the person could not see. readGlobal existed to bypass the
+    filter, and reads and writes had to be kept on the same path by hand or the mismatch silently
+    destroyed data.
 
-    Reads and writes must therefore use the same unfiltered path — never mix.
+    Neither half of that hazard survives. There is no filter to bypass - the store holds whatever
+    RLS allowed this person to load - and writes are row by row, so a record that was never read
+    is never written and cannot be removed by a reconciliation that could not see it.
   */
-  function read(key, fallback) {
-    if (window.PPMAuth && typeof window.PPMAuth.readGlobal === "function") {
-      const value = window.PPMAuth.readGlobal(
-        key,
-        clone(fallback),
-        "administration reconciles whole collections and must not drop out-of-scope records when saving"
-      );
-      return value === undefined || value === null ? clone(fallback) : value;
-    }
-    return parseJson(localStorage.getItem(key), fallback);
+  function read(collection, fallback) {
+    if (!window.PPMStore) return clone(fallback);
+    const value = window.PPMStore[collection].read();
+    return value === undefined || value === null ? clone(fallback) : value;
   }
 
   /*
@@ -123,24 +125,14 @@
     A design needing two independent interceptions to stay in step will eventually have one of
     them missing. There is one way in now, and it says what happened.
 
-    The collection is looked up from the key rather than mapped by hand, so adding a
-    configuration store to an adapter is all it takes to make it writable.
+    Named collections rather than storage keys, so nothing is translated on the way in.
   */
-  async function rawWrite(key, value) {
+  async function rawWrite(collection, value) {
     if (!window.PPMStore) {
       return {
         ok: false,
         reason: "failed",
         message: "The data layer is not loaded on this page, so nothing was saved.",
-        queued: false
-      };
-    }
-    const collection = window.PPMStore.collectionFor(key);
-    if (!collection) {
-      return {
-        ok: false,
-        reason: "invalid",
-        message: `No collection is registered for "${key}", so it cannot be saved.`,
         queued: false
       };
     }
@@ -314,7 +306,7 @@
     const stored = read(KEYS.portfolios, null);
     const rows = Array.isArray(stored) && stored.length ? stored : [defaultPortfolio()];
     const normalised = rows.filter(Boolean).map(normalisePortfolio);
-    const programmes = read("ppmProgrammes", []);
+    const programmes = read("programmes", []);
     if (Array.isArray(programmes)) {
       normalised.forEach((portfolio) => {
         portfolio.programmeIds = [];
@@ -343,7 +335,7 @@
 
   /* Stage 16: async, because it writes. Both callers await it. */
   async function syncProgrammePortfolioReferences(portfolios) {
-    const programmes = read("ppmProgrammes", []);
+    const programmes = read("programmes", []);
     if (!Array.isArray(programmes) || !programmes.length) return;
     const portfolioByProgramme = new Map();
     portfolios.forEach((portfolio) =>
@@ -375,7 +367,7 @@
         changed = true;
       }
     });
-    if (changed) return rawWrite("ppmProgrammes", programmes);
+    if (changed) return rawWrite("programmes", programmes);
     return { ok: true, saved: 0, nothingToDo: true };
   }
 
@@ -424,7 +416,7 @@
     )
       .filter(Boolean)
       .map(normalisePortfolio);
-    const programmes = read("ppmProgrammes", []);
+    const programmes = read("programmes", []);
     if (!Array.isArray(programmes)) return { portfolios: clone(portfolios), programmes: [], projects: [] };
     portfolios.forEach((portfolio) => {
       portfolio.programmeIds = [];
@@ -449,11 +441,11 @@
     const portfolioResult = await rawWrite(KEYS.portfolios, portfolios);
     if (!portfolioResult.ok) return { ...portfolioResult, portfolios };
     if (programmesChanged) {
-      const programmeResult = await rawWrite("ppmProgrammes", programmes);
+      const programmeResult = await rawWrite("programmes", programmes);
       if (!programmeResult.ok) return { ...programmeResult, portfolios };
     }
 
-    const projects = read("ppmProjects", []);
+    const projects = read("projects", []);
     let projectsChanged = false;
     if (Array.isArray(projects)) {
       projects.forEach((project) => {
@@ -483,7 +475,7 @@
         projectsChanged = true;
       });
       if (projectsChanged) {
-        const projectResult = await rawWrite("ppmProjects", projects);
+        const projectResult = await rawWrite("projects", projects);
         if (!projectResult.ok) return { ...projectResult, portfolios };
       }
     }
@@ -676,7 +668,7 @@
 
   function deriveLegacyProjectLifecycleAssignments(projectRows) {
     const supplied = Array.isArray(projectRows);
-    const stored = supplied ? projectRows : read("ppmProjects", null);
+    const stored = supplied ? projectRows : read("projects", null);
     if (!Array.isArray(stored)) return [];
     const projects = clone(stored);
     const templates = getLifecycleTemplates();
@@ -1268,8 +1260,8 @@
         });
     });
     if (settings.includeRelated && stageIndex >= 3 && source.projectCode) {
-      const planStore = read("ppmProjectPlans", {});
-      const milestoneStore = read("ppmProjectMilestones", {});
+      const planStore = read("plans", {});
+      const milestoneStore = read("milestones", {});
       const tasks = Array.isArray(planStore?.[source.projectCode]) ? planStore[source.projectCode] : [];
       const milestones = Array.isArray(milestoneStore?.[source.projectCode])
         ? milestoneStore[source.projectCode]
@@ -1570,7 +1562,7 @@
       it and PPMStore would rightly refuse it. It stays in localStorage, which is the one reason
       ppm-admin-utils.js remains on the Stage 16 list in VERIFY-STATIC.mjs.
     */
-    localStorage.setItem(KEYS.schemaVersion, JSON.stringify(SCHEMA_VERSION));
+    localStorage.setItem(SCHEMA_VERSION_KEY, JSON.stringify(SCHEMA_VERSION));
     return {
       portfolios: getPortfolios(),
       lifecycleTemplates: getLifecycleTemplates(),

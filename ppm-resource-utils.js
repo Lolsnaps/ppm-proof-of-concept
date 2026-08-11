@@ -1,23 +1,22 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "ppmResources";
   const CREATE_PERSON_VALUE = "__ppm_create_person__";
   let quickAddState = null;
 
-  const parseJson = (value, fallback) => PPMCore.parseJson(value, fallback, "resource data");
-
+  /*
+    Stage 16: people come from PPMStore, which holds what PostgreSQL confirmed, rather than from
+    the localStorage mirror hydration used to fill. all() already drops anything that is not a
+    record, so the defensive filtering that used to be here has one home instead of nine.
+  */
   function getResources() {
-    const resources = parseJson(localStorage.getItem(STORAGE_KEY), []);
-    return Array.isArray(resources)
-      ? resources.filter((resource) => resource && typeof resource === "object")
-      : [];
+    return window.PPMStore ? window.PPMStore.people.all() : [];
   }
 
   /*
     Stage 16: the one write seam.
 
-    Was localStorage.setItem(STORAGE_KEY, ...), which reached PostgreSQL only because both
+    Was localStorage.setItem("ppmResources", ...), which reached PostgreSQL only because both
     adapters had replaced Storage.prototype.setItem, and which returned before the database
     had been asked anything - so a caller could report success for a write the database went
     on to refuse.
@@ -364,33 +363,21 @@
       });
     };
 
-    const projects = parseJson(localStorage.getItem("ppmProjects"), []);
-    if (Array.isArray(projects)) {
-      projects.forEach((project) => {
-        addPerson(project.projectManager, project.projectManagerEmail, project.projectManagerResourceId);
-        addPerson(project.sponsor, project.sponsorEmail, project.sponsorResourceId);
-        addPerson(project.projectLead, project.projectLeadEmail, project.projectLeadResourceId);
-      });
-    }
+    /* all() flattens the project-keyed shape plans and RAID are stored in, so the three
+       different unpackings this used to do are now one call each. */
+    const store = window.PPMStore;
 
-    const plans = parseJson(localStorage.getItem("ppmProjectPlans"), {});
-    if (plans && typeof plans === "object" && !Array.isArray(plans)) {
-      Object.values(plans)
-        .filter(Array.isArray)
-        .flat()
-        .forEach((task) => {
-          addPerson(task.taskOwner, task.taskOwnerEmail, task.taskOwnerResourceId);
-        });
-    }
+    (store ? store.projects.all() : []).forEach((project) => {
+      addPerson(project.projectManager, project.projectManagerEmail, project.projectManagerResourceId);
+      addPerson(project.sponsor, project.sponsorEmail, project.sponsorResourceId);
+      addPerson(project.projectLead, project.projectLeadEmail, project.projectLeadResourceId);
+    });
 
-    const raid = parseJson(localStorage.getItem("ppmProjectRaid"), {});
-    const raidItems = Array.isArray(raid)
-      ? raid
-      : raid && typeof raid === "object"
-        ? Object.values(raid).filter(Array.isArray).flat()
-        : [];
+    (store ? store.plans.all() : []).forEach((task) => {
+      addPerson(task.taskOwner, task.taskOwnerEmail, task.taskOwnerResourceId);
+    });
 
-    raidItems.forEach((item) => {
+    (store ? store.raid.all() : []).forEach((item) => {
       addPerson(item.owner, item.ownerEmail, item.ownerResourceId);
       addPerson(item.raisedBy, item.raisedByEmail, item.raisedByResourceId);
       addPerson(item.resolutionOwner, item.resolutionOwnerEmail, item.resolutionOwnerResourceId);
@@ -495,7 +482,6 @@
   }
 
   window.PPMResources = {
-    STORAGE_KEY,
     getResources,
     saveResources,
     nextResourceId,

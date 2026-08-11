@@ -1,8 +1,6 @@
 (function () {
   "use strict";
 
-  const PROGRAMME_STORAGE_KEY = "ppmProgrammes";
-  const PROJECT_STORAGE_KEY = "ppmProjects";
 
   const DEFAULT_PROGRAMME_NAMES = ["Servicing", "Sales", "Propositions", "Mergers & Acquisitions", "BAU"];
 
@@ -103,8 +101,7 @@
     version, so an untouched project is not written at all.
   */
   async function migrateProjectProgrammeReferences(programmes) {
-    const projects = parseJson(localStorage.getItem(PROJECT_STORAGE_KEY), []);
-    if (!Array.isArray(projects)) return { ok: true, saved: 0, nothingToDo: true };
+    const projects = window.PPMStore ? window.PPMStore.projects.all() : [];
     let changed = false;
     projects.forEach((project) => {
       const byId = programmes.find((programme) => programme.programmeId === project.programmeId);
@@ -146,8 +143,8 @@
     makes that permanent.
   */
   function getProgrammes() {
-    const stored = parseJson(localStorage.getItem(PROGRAMME_STORAGE_KEY), null);
-    if (Array.isArray(stored) && stored.length) return normaliseProgrammes(stored);
+    const stored = window.PPMStore ? window.PPMStore.programmes.all() : [];
+    if (stored.length) return normaliseProgrammes(stored);
     return DEFAULT_PROGRAMME_NAMES.map(defaultProgramme);
   }
 
@@ -285,8 +282,6 @@
   }
 
   window.PPMGovernance = {
-    PROGRAMME_STORAGE_KEY,
-    PROJECT_STORAGE_KEY,
     DEFAULT_PROGRAMME_NAMES,
     STAGE_ORDER,
     getProgrammes,

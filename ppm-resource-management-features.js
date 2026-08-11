@@ -13,8 +13,6 @@
   ];
   const OPEN_DEMAND_STATUSES = ["Draft", "Proposed", "Requested", "Provisionally assigned", "Confirmed"];
   const ASSIGNED_STATUSES = ["Provisionally assigned", "Confirmed"];
-  const PROJECTS_KEY = "ppmProjects";
-  const PLANS_KEY = "ppmProjectPlans";
   const DAY_MS = 86400000;
   let activeTab = "gantt";
   let editingDemandId = "";
@@ -47,26 +45,15 @@
 
   const escapeHtml = PPMCore.escapeHtml;
 
-  function read(key, fallback) {
-    try {
-      const value = localStorage.getItem(key);
-      return value ? JSON.parse(value) : fallback;
-    } catch (error) {
-      console.error(`Could not read ${key}.`, error);
-      return fallback;
-    }
-  }
-
   function resources() {
     return PPMResources.getResources().filter((resource) => resource.active !== false);
   }
+  /* Stage 16: from PPMStore, which holds what PostgreSQL confirmed. */
   function projects() {
-    const rows = read(PROJECTS_KEY, []);
-    return Array.isArray(rows) ? rows : [];
+    return window.PPMStore ? PPMStore.projects.all() : [];
   }
   function plans() {
-    const store = read(PLANS_KEY, {});
-    return store && typeof store === "object" ? store : {};
+    return window.PPMStore ? PPMStore.plans.read() : {};
   }
   function iso(value) {
     return PPMPlanning.isoDate(value);
@@ -1069,13 +1056,19 @@
         audit: [{ action: "Created", at: now, by: "Resource planning team" }]
       };
       rows.push(scenario);
-      PPMPlanning.saveScenarios(rows);
+      /*
+        Awaited, and the answer looked at.
 
-      if (databaseWorkflow) {
-        await PPMChildDatabase.flush("resourceScenarios");
-        const pending = PPMChildDatabase.pendingWrites("resourceScenarios");
-        if (pending.length)
-          throw new Error("The scenario is still pending database save. Resolve the pending write before using it.");
+        This was `PPMPlanning.saveScenarios(rows);` with no await and no check - a write whose
+        failure went nowhere. The guard below made it look handled: it called flush() and then
+        asked whether anything was pending. flush() had been a no-op since the write-through was
+        deleted, and even before that the save had not been awaited, so "pending" was read before
+        the write had had a chance to finish or fail. Two mechanisms, neither working, reading as
+        a safeguard.
+      */
+      const savedScenario = await PPMPlanning.saveScenarios(rows);
+      if (!savedScenario.ok) {
+        throw new Error(savedScenario.message || "The scenario could not be saved.");
       }
 
       closeModal("rmScenarioModal");

@@ -1,7 +1,6 @@
 (function () {
   "use strict";
 
-  const RESOURCE_KEY = "ppmResources";
   const SESSION_KEY = "ppmAuthSession";
   const CURRENT_USER_KEY = "ppmCurrentUser";
 
@@ -20,9 +19,6 @@
   // that legacy pages read. They are session lifetime rules, not password rules.
   const SESSION_HOURS = 8;
   const IDLE_MINUTES = 30;
-  const originalStorageGet = Storage.prototype.getItem;
-  const originalStorageSet = Storage.prototype.setItem;
-  let storageScopeInstalled = false;
   let currentSession = null;
   let currentResource = null;
   let lastTouch = 0;
@@ -377,77 +373,45 @@
 
   const parseJson = (value, fallback) => PPMCore.parseJson(value, fallback);
 
-  function rawGet(key) {
-    return originalStorageGet.call(localStorage, key);
-  }
-  function rawSet(key, value) {
-    originalStorageSet.call(localStorage, key, value);
-  }
-  function rawRead(key, fallback) {
-    return parseJson(rawGet(key), fallback);
-  }
+  /* --------------------------------------------- the storage facade, and why it went
 
-  /* ------------------------------------------------------------ storage facade
+    There used to be four functions here and a rule about choosing between them:
 
-    There are two ways to reach stored data, and the difference matters:
+      readScoped / writeScoped   went through the patched localStorage, so somebody whose access
+                                 was limited to certain projects only saw and wrote those.
+      readGlobal / writeGlobal   deliberately bypassed that filter, for configuration that is not
+                                 project-scoped and for admin screens that must see everything.
 
-      readScoped / writeScoped   Go through the patched localStorage, so a user
-                                 whose access is limited to certain projects only
-                                 ever sees and writes those projects' records.
-                                 Use this for anything a normal user reads.
+    All four are gone with Stage 16, and it is worth being clear that this removes no protection,
+    because they never provided any. The filtering happened in this browser, in JavaScript the
+    person could read and change. What actually keeps one person out of another person's projects
+    is row-level security in PostgreSQL, evaluated at AAL2, which has not changed.
 
-      readGlobal / writeGlobal   Bypass the permission filter and return the full
-                                 contents. Only correct for configuration that is
-                                 not project-scoped (portfolios, lifecycle
-                                 templates, reference lists) and for the few admin
-                                 screens that must legitimately see every project,
-                                 such as the project-access picker.
+    What the four did provide was a way to get it wrong quietly. Reading through the filter and
+    writing back the whole collection deleted every record the reader could not see - that is why
+    ppm-admin-utils.js carried a warning never to mix the two paths. The store holds whatever RLS
+    allowed this person to load, and writes are row by row, so a record that was never read is
+    never written and the mistake is no longer expressible.
+  ------------------------------------------------------------------------------------- */
 
-    Previously these were chosen implicitly: calling localStorage directly gave
-    you the filtered view and calling rawRead gave you everything, which was
-    impossible to tell apart at the call site. Always pass a short `reason` to
-    readGlobal / writeGlobal so the justification sits next to the code.
+  /*
+    The people directory, from PPMStore.
 
-    SCOPED_KEYS below is the authoritative list of what the filter covers.
-  ------------------------------------------------------------------------- */
+    This used to read the localStorage mirror, and sign-in used to write the signed-in person
+    into it through saveResources() so that permission checks had somebody to work with before
+    hydration finished. Neither is needed now: hydration fills PPMStore from public.people, and
+    the one record that has to be available earlier than that is the person signing in, who is
+    already held in currentResource.
 
-  const SCOPED_KEYS = new Set([
-    "ppmProjects",
-    ...PROJECT_OBJECT_KEYS,
-    ...PROJECT_ARRAY_KEYS,
-    RESOURCE_SCENARIO_KEY
-  ]);
-
-  function isScopedKey(key) {
-    return SCOPED_KEYS.has(String(key));
-  }
-
-  function readScoped(key, fallback) {
-    return parseJson(localStorage.getItem(key), fallback);
-  }
-
-  function writeScoped(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-    return value;
-  }
-
-  // eslint-disable-next-line no-unused-vars -- `reason` documents the call site
-  function readGlobal(key, fallback, reason) {
-    return rawRead(key, fallback);
-  }
-
-  // eslint-disable-next-line no-unused-vars -- `reason` documents the call site
-  function writeGlobal(key, value, reason) {
-    rawSet(key, JSON.stringify(value));
-    return value;
-  }
-
+    So the session's own resource is folded in when the store does not have them yet - which is
+    the window before hydration, and nothing else.
+  */
   function getResources() {
-    const rows = rawRead(RESOURCE_KEY, []);
-    return Array.isArray(rows) ? rows.filter((row) => row && typeof row === "object") : [];
-  }
-  function saveResources(rows) {
-    rawSet(RESOURCE_KEY, JSON.stringify(rows));
+    const rows = window.PPMStore ? PPMStore.people.all() : [];
+    if (!currentResource?.resourceId) return rows;
+    return rows.some((row) => row.resourceId === currentResource.resourceId)
+      ? rows
+      : [...rows, currentResource];
   }
   function getResource(resourceId) {
     return getResources().find((row) => row.resourceId === resourceId) || null;
@@ -462,7 +426,7 @@
   */
   function removeRetiredCredentialStore() {
     try {
-      if (originalStorageGet.call(localStorage, RETIRED_CREDENTIAL_KEY) === null) return;
+      if (localStorage.getItem(RETIRED_CREDENTIAL_KEY) === null) return;
       localStorage.removeItem(RETIRED_CREDENTIAL_KEY);
       console.info("Removed the obsolete local credential store; sign-in is handled by Supabase Auth.");
     } catch (error) {
@@ -556,7 +520,7 @@
     const id = resource?.resourceId || "";
     const name = normalise(resource?.fullName);
     const email = normalise(resource?.email);
-    const projects = rawRead("ppmProjects", []);
+    const projects = window.PPMStore ? PPMStore.projects.all() : [];
     const matchesPerson = (record) => {
       const fields = [
         "projectManager",
@@ -581,16 +545,11 @@
           codes.add(recordProjectCode(project));
       });
 
-    const objectKeys = [
-      "ppmProjectPlans",
-      "ppmProjectRaid",
-      "ppmProjectActions",
-      "ppmProjectDecisions",
-      "ppmProjectBenefits",
-      "ppmStageGates"
-    ];
-    objectKeys.forEach((key) => {
-      const store = rawRead(key, {});
+    /* Collections, not storage keys. Section 2g of VERIFY-STATIC.mjs checks every name here
+       against the adapters' own registries. */
+    const projectKeyed = ["plans", "raid", "actions", "decisions", "benefits", "stageGates"];
+    projectKeyed.forEach((collection) => {
+      const store = window.PPMStore ? PPMStore[collection].read() : {};
       const groups = Array.isArray(store) ? { legacy: store } : store;
       if (!groups || typeof groups !== "object") return;
       Object.entries(groups).forEach(([code, rows]) => {
@@ -635,7 +594,7 @@
       });
     });
 
-    const demand = rawRead("ppmResourceDemand", []);
+    const demand = window.PPMStore ? PPMStore.resourceDemand.all() : [];
     if (Array.isArray(demand))
       demand.forEach((row) => {
         if ([row.resourceId, row.resourceResourceId, row.assignedResourceId].includes(id))
@@ -654,7 +613,7 @@
           .filter((row) => normalise(row.team) === team)
           .map((row) => row.resourceId)
       );
-      const planStore = rawRead("ppmProjectPlans", {});
+      const planStore = window.PPMStore ? PPMStore.plans.read() : {};
       if (planStore && typeof planStore === "object")
         Object.entries(planStore).forEach(([code, rows]) => {
           if (Array.isArray(rows) && rows.some((row) => teamResourceIds.has(row.taskOwnerResourceId)))
@@ -680,18 +639,6 @@
       : rows.filter((project) => canAccessProject(recordProjectCode(project), user));
   }
 
-  function filterProjectObject(store, user) {
-    if (!store || typeof store !== "object" || Array.isArray(store)) return store;
-    return Object.fromEntries(Object.entries(store).filter(([code]) => canAccessProject(code, user)));
-  }
-  function filterProjectArray(rows, user) {
-    if (!Array.isArray(rows)) return rows;
-    return rows.filter((row) => {
-      const code = recordProjectCode(row);
-      return !code || canAccessProject(code, user);
-    });
-  }
-
   function resourceScenarioProjectCodes(row) {
     const demands = Array.isArray(row?.demands) ? row.demands : [];
     return [...new Set(demands.map(recordProjectCode).filter(Boolean))];
@@ -702,77 +649,29 @@
     return codes.every((code) => canAccessProject(code, user));
   }
 
-  function filterResourceScenarios(rows, user) {
-    if (!Array.isArray(rows)) return rows;
-    return rows.filter((row) => canAccessResourceScenario(row, user));
-  }
-  function mergeProjectObject(existing, incoming, user) {
-    const base = existing && typeof existing === "object" && !Array.isArray(existing) ? existing : {};
-    const next = incoming && typeof incoming === "object" && !Array.isArray(incoming) ? incoming : {};
-    const hidden = Object.fromEntries(Object.entries(base).filter(([code]) => !canAccessProject(code, user)));
-    return { ...hidden, ...next };
-  }
-  function mergeProjectArray(existing, incoming, user) {
-    const base = Array.isArray(existing) ? existing : [];
-    const next = Array.isArray(incoming) ? incoming : [];
-    return [
-      ...base.filter((row) => {
-        const code = recordProjectCode(row);
-        return code && !canAccessProject(code, user);
-      }),
-      ...next
-    ];
-  }
+  /* ------------------------------------- the storage scope patch, and why it went
 
-  function mergeResourceScenarios(existing, incoming, user) {
-    const base = Array.isArray(existing) ? existing : [];
-    const next = Array.isArray(incoming) ? incoming : [];
-    return [
-      ...base.filter((row) => !canAccessResourceScenario(row, user)),
-      ...next
-    ];
-  }
+     installStorageScope() replaced Storage.prototype.getItem and setItem for the whole page. A
+     read of ppmProjects came back filtered to the projects this person could see; a write was
+     merged with the records they could not, so that saving a filtered list did not delete the
+     rest. Six helper functions existed to do that filtering and merging.
 
-  function installStorageScope(resource) {
-    if (storageScopeInstalled || effectiveScope(resource) === "Portfolio-wide") return;
-    storageScopeInstalled = true;
-    Storage.prototype.getItem = function (key) {
-      const value = originalStorageGet.call(this, key);
-      if (this !== localStorage || !currentResource || !value) return value;
-      if (key === "ppmProjects") return JSON.stringify(filterProjects(parseJson(value, []), currentResource));
-      if (PROJECT_OBJECT_KEYS.has(key))
-        return JSON.stringify(filterProjectObject(parseJson(value, {}), currentResource));
-      if (key === RESOURCE_SCENARIO_KEY)
-        return JSON.stringify(filterResourceScenarios(parseJson(value, []), currentResource));
-      if (PROJECT_ARRAY_KEYS.has(key))
-        return JSON.stringify(filterProjectArray(parseJson(value, []), currentResource));
-      return value;
-    };
-    Storage.prototype.setItem = function (key, value) {
-      if (this !== localStorage || !currentResource) return originalStorageSet.call(this, key, value);
-      if (key === "ppmProjects") {
-        const merged = mergeProjectArray(parseJson(rawGet(key), []), parseJson(value, []), currentResource);
-        return rawSet(key, JSON.stringify(merged));
-      }
-      if (PROJECT_OBJECT_KEYS.has(key)) {
-        const merged = mergeProjectObject(parseJson(rawGet(key), {}), parseJson(value, {}), currentResource);
-        return rawSet(key, JSON.stringify(merged));
-      }
-      if (key === RESOURCE_SCENARIO_KEY) {
-        const merged = mergeResourceScenarios(
-          parseJson(rawGet(key), []),
-          parseJson(value, []),
-          currentResource
-        );
-        return rawSet(key, JSON.stringify(merged));
-      }
-      if (PROJECT_ARRAY_KEYS.has(key)) {
-        const merged = mergeProjectArray(parseJson(rawGet(key), []), parseJson(value, []), currentResource);
-        return rawSet(key, JSON.stringify(merged));
-      }
-      return originalStorageSet.call(this, key, value);
-    };
-  }
+     All of it is gone, and it is worth being exact about what that does and does not change.
+
+     It removes no protection. The filtering happened in this browser, in JavaScript the person
+     could read and edit; anybody who wanted the unfiltered list only had to call rawRead. What
+     keeps one person out of another person's projects is row-level security in PostgreSQL,
+     evaluated at AAL2 - unchanged, and now the only thing making the claim.
+
+     What it does remove is a way to be wrong. Reading through the filter and writing back the
+     whole collection deleted every record the reader could not see, which is why the merge
+     existed and why ppm-admin-utils.js carried a warning never to mix the filtered and
+     unfiltered paths. PPMStore holds whatever RLS returned and writes row by row, so a record
+     that was never read is never written, and the mistake cannot be made.
+
+     It also removes the last assignment to Storage.prototype in the application. VERIFY-STATIC
+     §2d now allows none at all, rather than excusing this file.
+  */
 
   function bytesToBase64(bytes) {
     let binary = "";
@@ -790,26 +689,15 @@
     return bytesToBase64(values);
   }
 
-  function audit(action, resource, summary, changes) {
-    const rows = rawRead("ppmAuditHistory", []);
-    const now = new Date().toISOString();
-    const record = {
-      auditId: `AUD-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      timestamp: now,
-      projectCode: "",
-      entityType: "User access",
-      entityId: resource?.resourceId || "AUTH",
-      action,
-      summary,
-      actorName: resource?.fullName || resource?.email || "Unknown user",
-      actorResourceId: resource?.resourceId || "",
-      actorEmail: resource?.email || "",
-      actorRole: resource?.accessRole || "",
-      changes: Array.isArray(changes) ? changes : [],
-      sourcePage: currentPage()
-    };
-    rawSet("ppmAuditHistory", JSON.stringify([...(Array.isArray(rows) ? rows : []), record]));
-  }
+  /*
+    PPMAuth.audit() was here. It appended a "User access" event to ppmAuthHistory in the browser.
+
+    Stage 14 removed browser-side audit emission everywhere else on the grounds that the database
+    records changes itself - public.audit_log holds 46 rows for public.people, written by a
+    trigger, naming the actor. This one was missed. Once the mirror went it would have been
+    writing governance history to a key nothing reads and hydration would replace, which is worse
+    than not writing it: an audit trail that quietly is not one.
+  */
 
   /*
     The old PPMAuth.login(email, password) lived here. It read ppmAuthCredentials,
@@ -827,12 +715,8 @@
     const storedSession = parseJson(sessionStorage.getItem(SESSION_KEY), null);
     const resource =
       currentResource || (storedSession?.resourceId ? getResource(storedSession.resourceId) : null);
-    if (resource)
-      audit(
-        "Signed out",
-        resource,
-        `${resource.fullName || resource.email} signed out${reason ? ` (${reason})` : ""}.`
-      );
+    void resource;
+    void reason;
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(CURRENT_USER_KEY);
     currentSession = null;
@@ -879,7 +763,9 @@
 
     if (index >= 0) rows[index] = resource;
     else rows.push(resource);
-    saveResources(rows);
+    /* Not saved anywhere. public.people already holds this person - that is where `person` above
+       came from - and hydration will bring the whole directory into PPMStore moments from now.
+       Until then getResources() folds in currentResource, which is set from this object. */
 
     const now = Date.now();
     const session = {
@@ -906,10 +792,6 @@
 
     currentSession = session;
     currentResource = resource;
-    installStorageScope(resource);
-
-    if (options?.audit !== false)
-      audit("Signed in", resource, `${resource.fullName || resource.email} signed in using Supabase Auth and MFA.`);
 
     return resource;
   }
@@ -1203,8 +1085,7 @@
   function enforceOwnPlanRows() {
     if (!restrictedToOwnPlanRows(currentResource) || currentPage() !== "project-plan.html") return;
     const code = requestedProjectCode();
-    const store = rawRead("ppmProjectPlans", {});
-    const tasks = Array.isArray(store?.[code]) ? store[code] : [];
+    const tasks = window.PPMStore ? PPMStore.plans.forProject(code) : [];
     document.querySelectorAll("tr[data-task-id]").forEach((row) => {
       const task = tasks.find((item) => item.taskId === row.dataset.taskId);
       if (task?.taskOwnerResourceId === currentResource.resourceId) return;
@@ -1248,7 +1129,7 @@
       return;
     const main = document.querySelector("main");
     if (!main) return;
-    const projects = filterProjects(rawRead("ppmProjects", []));
+    const projects = filterProjects(window.PPMStore ? PPMStore.projects.all() : []);
     main.innerHTML = `<div class="page-heading"><div><h2>Financial status</h2><p>Your role can view financial RAG status but not budget, forecast, actual or commitment values.</p></div></div><div class="ppm-scope-note">Cost values and approval detail are restricted. Contact the Project Manager, Sponsor or PMO if you need additional access.</div><section class="ppm-finance-rag-only">${
       projects
         .map((project) => {
@@ -1277,7 +1158,6 @@
       location.replace(loginUrl());
       return null;
     }
-    installStorageScope(currentResource);
     document.documentElement.classList.remove("ppm-auth-pending");
     return currentResource;
   }
@@ -1359,7 +1239,6 @@
     roleNames,
     roleDefinition,
     getResources,
-    saveResources,
     getResource,
     getCurrentUser,
     establishSupabaseSession,
@@ -1380,18 +1259,7 @@
     // Sign-in is Supabase Auth + TOTP only; nothing here handles passwords.
     logout,
     endSession,
-    audit,
     safeReturnUrl,
     permissionToast,
-    SCOPED_KEYS,
-    isScopedKey,
-    readScoped,
-    writeScoped,
-    readGlobal,
-    writeGlobal,
-    // Low-level, unfiltered access. Prefer readGlobal / writeGlobal, which say
-    // the same thing but record why the permission filter is being bypassed.
-    rawRead,
-    rawSet
   };
 })();

@@ -124,16 +124,16 @@
     }
   }
 
-  // Reads past the permission filter deliberately: the adapter compares whole
-  // collections, and scoping is applied by the caller or by RLS.
+  /*
+    What this browser currently holds for a collection.
+
+    It used to mean "what is in localStorage under the legacy key". It now means "what is in
+    PPMStore", which is the same question with one fewer copy of the answer: whatever the last
+    successful hydration loaded, or nothing if there has not been one.
+  */
   function localRecords(moduleName) {
-    const key = MODULES[moduleName]?.localKey;
-    if (!key) return [];
-    const raw =
-      window.PPMAuth && typeof PPMAuth.rawRead === "function"
-        ? PPMAuth.rawRead(key, [])
-        : parseJson(localStorage.getItem(key), []);
-    return Array.isArray(raw) ? raw.filter((row) => row && typeof row === "object") : [];
+    if (!MODULES[moduleName] || !window.PPMStore) return [];
+    return PPMStore[moduleName].all();
   }
 
   /*
@@ -560,12 +560,12 @@
       reports that as a perfectly successful empty result. Every WRITE path already
       refuses below aal2; the read path only checked that a session existed, so an
       empty result was indistinguishable from "this account genuinely has no records"
-      and hydration wrote [] over the browser mirror for every collection.
+      and hydration emptied every collection.
 
-      That is worse than it sounds. The Supabase session lives in sessionStorage, which
-      is per tab, while the mirror lives in localStorage, which is per profile - so one
-      tab sitting between password and authenticator emptied the data every other tab
-      was showing. It looked exactly like total data loss and self-corrected on the next
+      That was worse than it sounds while a localStorage mirror existed. The Supabase session
+      lives in sessionStorage, which is per tab, while the mirror lived in localStorage, which is
+      per profile - so one tab sitting between password and authenticator emptied the data every
+      other tab was showing. It looked exactly like total data loss and self-corrected on the next
       hydration, which is why it read as "nothing shows until I go and do something".
 
       "A successful zero-row query is security truth" holds at aal2. Below it the query
@@ -620,8 +620,8 @@
 
     if (!result.ok) {
       console.warn(
-        `PPMDatabase: the "${moduleName}" query failed - falling back to the last copy ` +
-          `hydrated into browser storage so the page keeps working. The data may be stale.`,
+        `PPMDatabase: the "${moduleName}" query failed - falling back to whatever this page has ` +
+          `already loaded so it keeps working. The data may be stale.`,
         result.error
       );
       return localRecords(moduleName);
@@ -631,7 +631,7 @@
       const local = localRecords(moduleName);
       if (local.length) {
         console.warn(
-          `PPMDatabase: the database returned no "${moduleName}" rows, but browser storage holds ${local.length}. ` +
+          `PPMDatabase: the database returned no "${moduleName}" rows, but this page is holding ${local.length}. ` +
             `This is a real answer, not an error - row-level security may be filtering everything out. ` +
             `Local data was NOT substituted. Run PPMDatabase.explain() to see the current session.`
         );
@@ -979,6 +979,13 @@
   }
 
   /* Used by hydrate() to drop only the entries that reloading actually resolves. */
+  /* One record's entry, by key. clearPendingFor() takes a whole collection, which is right for
+     "I have noted these and want them gone" and wrong for "this one just saved". */
+  function clearPendingEntry(moduleName, key) {
+    const kept = readPending().filter((entry) => !(entry?.module === moduleName && entry?.key === key));
+    localStorage.setItem(PENDING_KEY, JSON.stringify(kept));
+  }
+
   function clearPendingFor(moduleName, kind) {
     const kept = readPending().filter(
       (entry) => !(entry?.module === moduleName && (!kind || entry?.kind === kind))
@@ -1003,8 +1010,26 @@
     Saves one record. Existing rows are matched on their business key, not on a
     database id, because the legacy code paths that produce these records have
     never heard of UUIDs.
+
+    The outcome goes in the pending ledger, which it did not until now. saveRecords() recorded
+    the failures it collected, but PPMStore calls saveRecord() directly, one row at a time - so
+    since Stage 16 every conflict, refusal and failure on a foundation collection went unrecorded
+    and pendingWrites() answered "nothing outstanding" however much had gone wrong.
   */
   async function saveRecord(moduleName, record, options) {
+    return recordOutcome(await attemptSave(moduleName, record, options));
+  }
+
+  /* Adds the outcome to the ledger, or takes it out again once it succeeds. A ledger that only
+     grows stops meaning "what is outstanding". */
+  function recordOutcome(result) {
+    if (!result) return result;
+    if (result.status === "saved") clearPendingEntry(result.module, result.key);
+    else recordPending({ ...result, kind: result.status });
+    return result;
+  }
+
+  async function attemptSave(moduleName, record, options) {
     const writer = WRITERS[moduleName];
     if (!writer) throw new Error(`"${moduleName}" cannot be written to the database.`);
 
@@ -1171,7 +1196,7 @@
       else {
         const bucket = result.status === "conflict" ? "conflicts" : result.status === "refused" ? "refused" : "failed";
         outcome[bucket].push(result);
-        recordPending({ ...result, kind: result.status });
+        /* saveRecord() has already put it in the ledger. */
       }
     }
 
@@ -1537,34 +1562,26 @@
         The entry is kept, so pendingWrites() can still show what was rejected and why. What
         changes is that the database is allowed to win, which it already had.
       */
-      const pendingHere = readPending().filter((p) => p.module === name);
-      const stuck = pendingHere.filter((p) => p.kind !== "conflict" && p.kind !== "refused");
-      const staleConflicts = pendingHere.filter((p) => p.kind === "conflict");
-      const refusals = pendingHere.filter((p) => p.kind === "refused");
+      /*
+        A pending write no longer stops the refresh. Any of them.
 
-      if (refusals.length) {
-        console.warn(
-          `PPMDatabase: ${refusals.length} "${name}" change(s) were refused by the database and cannot be retried. ` +
-            `Refreshing anyway - the database copy is the real one. Run PPMDatabase.pendingWrites() to see what was ` +
-            `rejected, then PPMDatabase.clearPendingFor("${name}", "refused") once you have noted it.`
-        );
-      }
+        This blocked hydration whenever a change had not been saved, because the browser mirror
+        held that change and refreshing would have overwritten it. That reasoning went with the
+        mirror. A failed save updates nothing - PPMStore only changes the store once PostgreSQL
+        confirms - so there is no local copy left to protect, and refusing to refresh now buys
+        nothing and costs everything: with no mirror to fall back on, a skipped collection is an
+        empty one, and the page shows nothing at all.
 
-      if (staleConflicts.length && !stuck.length) {
-        clearPendingFor(name, "conflict");
+        The ledger stays, and is reported rather than acted on.
+      */
+      const unsaved = readPending().filter((p) => p.module === name);
+      if (unsaved.length) {
+        const kinds = [...new Set(unsaved.map((p) => p.kind))].join(", ");
         console.warn(
-          `PPMDatabase: cleared ${staleConflicts.length} stale "${name}" conflict(s) by reloading the database copy. ` +
-            `Reapply the edit if it is still needed.`
+          `PPMDatabase: ${unsaved.length} "${name}" change(s) did not save (${kinds}). Refreshing from the database ` +
+            `anyway - it holds the only copy. Run PPMDatabase.pendingWrites() to see them, then ` +
+            `PPMDatabase.clearPendingFor("${name}") once you have.`
         );
-      }
-
-      if (stuck.length) {
-        report.skipped.push({ module: name, reason: `${stuck.length} unsaved change(s) pending` });
-        console.warn(
-          `PPMDatabase: not refreshing "${name}" from the database - ${stuck.length} change(s) have not been saved yet ` +
-            `and would be overwritten. Run PPMDatabase.pendingWrites() to see them.`
-        );
-        continue;
       }
 
       const result = await query(name);
@@ -1579,17 +1596,17 @@
 
       try {
         /*
-          Written past the project-scoping filter deliberately, using PPMAuth's
-          rawSet - which holds the genuinely native setItem captured before that
-          filter was installed.
+          Straight into PPMStore, which every page reads from.
 
-          It matters. The filter merges records the user cannot see back into
-          whatever is being written. During hydration that would reintroduce
-          stale local copies of rows row-level security has already excluded,
-          and write-through would then try to push them back. Row-level security
-          has decided what this user may see; re-filtering adds nothing.
+          This used to write result.rows into localStorage under the collection's legacy key,
+          past the project-scoping filter, using a natively-captured setItem. The comment here
+          explained at length why the filter had to be avoided during hydration: it merged back
+          records the user could not see, reintroducing stale copies of rows row-level security
+          had already excluded. All of that reasoning existed to make a browser copy behave, and
+          all of it goes with the copy. Row-level security decided what this person may load;
+          what it returned is what the store holds.
         */
-        rawSetLocal(MODULES[name].localKey, JSON.stringify(result.rows));
+        adopt(name, result.rows);
         snapshot(name, result.rows);
         cache.set(name, result.rows);
         report.hydrated.push({ module: name, records: result.rows.length });
@@ -1608,19 +1625,21 @@
   }
 
   /*
-    ppm-auth-utils.js loads first and replaces Storage.prototype.setItem/getItem
-    with the project-scoping filter, so by the time this file runs the originals
-    are already gone. PPMAuth kept references to the real ones before patching
-    and exposes them as rawSet / rawRead - the only reliable way to reach
-    storage unfiltered from here.
+    Hands a hydrated collection to PPMStore.
+
+    ppm-data.js loads after this file, so PPMStore does not exist while this module is being
+    defined - but hydration is asynchronous and its first await yields before any row is
+    fetched, so by the time there is anything to adopt, it is there. The guard is for the one
+    case that is not true: a page that loaded the adapters and not the data layer, where saying
+    so once is better than throwing inside hydration and losing the rest of the collections.
   */
-  function rawSetLocal(key, text) {
-    if (window.PPMAuth && typeof PPMAuth.rawSet === "function") return PPMAuth.rawSet(key, text);
-    return Storage.prototype.setItem.call(localStorage, key, text);
-  }
-  function rawReadLocal(key, fallback) {
-    if (window.PPMAuth && typeof PPMAuth.rawRead === "function") return PPMAuth.rawRead(key, fallback);
-    return parseJson(Storage.prototype.getItem.call(localStorage, key), fallback);
+  function adopt(name, rows) {
+    if (window.PPMStore && typeof PPMStore.adopt === "function") return PPMStore.adopt(name, rows);
+    console.error(
+      `PPMDatabase: ppm-data.js is not loaded, so "${name}" was fetched from the database and had ` +
+        `nowhere to go. This page will show nothing.`
+    );
+    return false;
   }
 
   /* ============================================ Stage 16: the write-through is gone
@@ -1646,8 +1665,8 @@
      refuses a business collection written to localStorage outside ppm-data.js, and refuses a
      PPMStore write whose result is discarded.
 
-     Hydration still uses PPMAuth.rawSet to fill the browser mirror that pages read from. That is
-     a read path, not a write seam, and it goes when the reads are migrated.
+     The browser mirror those seams wrote to is gone as well. Hydration hands each collection
+     straight to PPMStore, so there is one copy of the data in the page and none in localStorage.
   */
 
   /* Runs on load, before page scripts read anything. Hydration only now - there are no seams

@@ -10,13 +10,9 @@ let projects = [],
   pendingApprovalFocus = parameters.get("item") || "";
 const el = (id) => document.getElementById(id);
 const escapeHtml = PPMCore.escapeHtml;
+/* Stage 16: from PPMStore, which holds what PostgreSQL confirmed. */
 function readProjects() {
-  try {
-    const rows = JSON.parse(localStorage.getItem("ppmProjects") || "[]");
-    return Array.isArray(rows) ? rows : [];
-  } catch (error) {
-    return [];
-  }
+  return PPMStore.projects.all();
 }
 function selectedProject() {
   return projects.find((project) => project.projectCode === el("projectSelect").value) || null;

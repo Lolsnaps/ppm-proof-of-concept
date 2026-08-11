@@ -5,7 +5,7 @@
     actions: {
       label: "Actions",
       singular: "action",
-      storageKey: "ppmProjectActions",
+      collection: "actions",
       idField: "actionId",
       idPrefix: "ACT",
       statusField: "status",
@@ -42,7 +42,7 @@
     decisions: {
       label: "Decisions",
       singular: "decision",
-      storageKey: "ppmProjectDecisions",
+      collection: "decisions",
       idField: "decisionId",
       idPrefix: "DEC",
       statusField: "status",
@@ -76,7 +76,7 @@
     financials: {
       label: "Financials",
       singular: "financial record",
-      storageKey: "ppmProjectFinancials",
+      collection: "financials",
       idField: "financialId",
       idPrefix: "FIN",
       statusField: "financialRag",
@@ -117,7 +117,7 @@
     benefits: {
       label: "Benefits",
       singular: "benefit",
-      storageKey: "ppmProjectBenefits",
+      collection: "benefits",
       idField: "benefitId",
       idPrefix: "BEN",
       statusField: "status",
@@ -173,7 +173,7 @@
     documents: {
       label: "Documents",
       singular: "document link",
-      storageKey: "ppmProjectDocuments",
+      collection: "documents",
       idField: "documentId",
       idPrefix: "DOC",
       statusField: "status",
@@ -229,7 +229,7 @@
     statusReports: {
       label: "Status Reports",
       singular: "status report",
-      storageKey: "ppmStatusReports",
+      collection: "statusReports",
       idField: "reportId",
       idPrefix: "STS",
       statusField: "status",
@@ -309,31 +309,21 @@
     return { key, label, type, width, required: Boolean(required), options: options || [] };
   }
 
-  const readJson = (key, fallback) => PPMCore.readJson(key, fallback);
+  /*
+    Stage 16: reads come from PPMStore, and the flattening with them.
 
-  function flattenStore(store) {
-    if (Array.isArray(store)) return store.filter(Boolean);
-    if (!store || typeof store !== "object") return [];
-    return Object.entries(store).flatMap(([storageGroup, rows]) =>
-      Array.isArray(rows)
-        ? rows.filter(Boolean).map((row) => ({
-            ...row,
-            projectCode:
-              row.projectCode ||
-              row.projectId ||
-              (/^(programme:|__)/i.test(storageGroup) ? "" : storageGroup),
-            programmeId:
-              row.programmeId || (storageGroup.startsWith("programme:") ? storageGroup.slice(10) : "")
-          }))
-        : []
-    );
+    This module used to unpack the project-keyed store itself, filling in a row's project code
+    or programme id from the key it was filed under. Two other modules had their own copy of the
+    same idea. all() does it once now, from the collection's registered project field, and
+    keeps the "programme:<id>" convention this module invented.
+  */
+  function rowsOf(collection) {
+    return window.PPMStore ? window.PPMStore[collection].all() : [];
   }
 
   function readRecords(type) {
     const schema = REGISTER_SCHEMAS[type];
-    return schema
-      ? flattenStore(readJson(schema.storageKey, {})).map((record) => prepareRecord(type, record))
-      : [];
+    return schema ? rowsOf(schema.collection).map((record) => prepareRecord(type, record)) : [];
   }
 
   async function writeRecords(type, records) {
@@ -365,16 +355,7 @@
         queued: false
       };
     }
-    const collection = window.PPMStore.collectionFor(schema.storageKey);
-    if (!collection) {
-      return {
-        ok: false,
-        reason: "invalid",
-        message: `No collection is registered for "${schema.storageKey}".`,
-        queued: false
-      };
-    }
-    return window.PPMStore.replaceAll(collection, store);
+    return window.PPMStore.replaceAll(schema.collection, store);
   }
 
   function generateId(type, records) {
@@ -482,8 +463,8 @@
     return Math.round((Number(value) || 0) * factor) / factor;
   }
 
-  function projectStoreRows(key, projectCode) {
-    return flattenStore(readJson(key, {})).filter(
+  function projectStoreRows(collection, projectCode) {
+    return rowsOf(collection).filter(
       (row) =>
         String(row.projectCode || row.projectId || "").toLowerCase() ===
         String(projectCode || "").toLowerCase()
@@ -505,20 +486,17 @@
   }
 
   function buildStatusReport(projectCode, records, base) {
-    const projects = readJson("ppmProjects", []);
-    const project = Array.isArray(projects)
-      ? projects.find(
-          (item) => String(item.projectCode).toLowerCase() === String(projectCode || "").toLowerCase()
-        )
-      : null;
-    const planStore = readJson("ppmProjectPlans", {});
-    const tasks = Array.isArray(planStore[projectCode]) ? planStore[projectCode] : [];
-    const milestones = projectStoreRows("ppmProjectMilestones", projectCode);
-    const raid = projectStoreRows("ppmProjectRaid", projectCode);
-    const decisions = projectStoreRows("ppmProjectDecisions", projectCode).filter(
+    const project =
+      rowsOf("projects").find(
+        (item) => String(item.projectCode).toLowerCase() === String(projectCode || "").toLowerCase()
+      ) || null;
+    const tasks = projectStoreRows("plans", projectCode);
+    const milestones = projectStoreRows("milestones", projectCode);
+    const raid = projectStoreRows("raid", projectCode);
+    const decisions = projectStoreRows("decisions", projectCode).filter(
       (item) => !["Approved", "Rejected", "Closed"].includes(item.status)
     );
-    const financial = projectStoreRows("ppmProjectFinancials", projectCode)[0];
+    const financial = projectStoreRows("financials", projectCode)[0];
     const benefits = readRecords("benefits").filter(
       (item) =>
         String(item.projectCode || "").toLowerCase() === String(projectCode || "").toLowerCase() ||
@@ -615,8 +593,6 @@
 
   window.PPMRegisters = {
     schemas: REGISTER_SCHEMAS,
-    readJson,
-    flattenStore,
     readRecords,
     writeRecords,
     newRecord,

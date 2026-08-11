@@ -93,7 +93,6 @@
   /* Read-only historical audit rows recorded before the migration. */
   const READ_ONLY_MODULES = Object.freeze(["legacyAudit"]);
   const baseline = new Map();
-  const writeQueues = new Map();
   let writeThroughInstalled = false;
   let hydrated = false;
   const ADAPTER_FIELDS = new Set([
@@ -1489,16 +1488,28 @@
     }
   }
 
-  function rawRead(key, fallback) {
-    if (window.PPMAuth && typeof PPMAuth.rawRead === "function")
-      return PPMAuth.rawRead(key, fallback);
-    return parseJson(localStorage.getItem(key), fallback);
+  /*
+    Hands a hydrated collection to PPMStore, which is the only place it goes.
+
+    These were rawRead and rawSet: a pair that reached localStorage past the project-scoping
+    filter, so that hydration could fill the mirror without the filter merging back rows
+    row-level security had already excluded. There is no mirror and no filter now.
+
+    ppm-data.js loads after this file, so PPMStore does not exist while this module is being
+    defined - but hydration is asynchronous and yields before it fetches anything, so it is
+    there by the time there is a collection to hand over.
+  */
+  function adopt(moduleName, store) {
+    if (window.PPMStore && typeof PPMStore.adopt === "function") return PPMStore.adopt(moduleName, store);
+    console.error(
+      `PPMChildDatabase: ppm-data.js is not loaded, so "${moduleName}" was fetched from the database ` +
+        `and had nowhere to go. This page will show nothing.`
+    );
+    return false;
   }
 
-  function rawSet(key, value) {
-    if (window.PPMAuth && typeof PPMAuth.rawSet === "function")
-      return PPMAuth.rawSet(key, value);
-    return localStorage.setItem(key, value);
+  function held(moduleName) {
+    return window.PPMStore && MODULES[moduleName] ? PPMStore[moduleName].read() : emptyStoreFor(moduleDefinition(moduleName));
   }
 
   function activeModules() {
@@ -1725,9 +1736,7 @@
   }
 
   function flattenLocal(moduleName) {
-    const definition = moduleDefinition(moduleName);
-    const fallback = emptyStoreFor(definition);
-    return flattenStore(moduleName, rawRead(definition.localKey, fallback));
+    return flattenStore(moduleName, held(moduleName));
   }
 
   function validateLocal(moduleName) {
@@ -1983,11 +1992,9 @@
     const code = String(projectCode || "").trim();
     if (!code) return null;
 
-    const localProjects = rawRead("ppmProjects", []);
-    if (Array.isArray(localProjects)) {
-      const match = localProjects.find((row) => String(row?.projectCode || "").trim() === code);
-      if (match?.databaseId) return match.databaseId;
-    }
+    const localProjects = window.PPMStore ? PPMStore.projects.all() : [];
+    const match = localProjects.find((row) => String(row?.projectCode || "").trim() === code);
+    if (match?.databaseId) return match.databaseId;
 
     const supabase = client();
     if (!supabase) return null;
@@ -2390,41 +2397,36 @@
     }
 
     /*
-      Stage 16: a refusal is terminal and must not block hydration.
+      A pending write no longer stops the refresh. Any of them.
 
-      A network failure may still land on retry, so its local copy is worth protecting. A
-      refusal will not: the database has permanently rejected it. Blocking on one meant this
-      collection was never refreshed again in that browser - stale for ever, explained once in
-      a console message on load.
+      This blocked hydration whenever a change had not been saved, because the browser mirror
+      held that change and refreshing would have overwritten it. That reasoning went with the
+      mirror. A failed save updates nothing - PPMStore only changes the store once PostgreSQL
+      confirms - so there is no local copy left to protect, and refusing to refresh now buys
+      nothing and costs everything: with no mirror to fall back on, a skipped collection is an
+      empty one, and the page shows nothing at all.
 
-      Found in the field: a plan baseline refused on 9 August was still blocking every refresh
-      of planBaselines two days later. The entry stays in the pending log so pendingWrites()
-      can still report what was rejected; it simply stops holding the collection hostage.
+      It was already the wrong trade. Two rounds of this shipped: a refused plan baseline from 9
+      August still blocking every refresh two days later, and before that a conflict doing the
+      same. Each time the fix was to excuse one more kind. The honest version is that the
+      database copy is the only copy, so it always wins.
+
+      The ledger stays, and is reported rather than acted on: pendingWrites() still shows what
+      failed and why, which is the part that was ever any use.
     */
-    const refused = pendingFor(moduleName).filter((row) => row.kind === "refused");
-    if (refused.length) {
+    const unsaved = pendingFor(moduleName);
+    if (unsaved.length) {
+      const kinds = [...new Set(unsaved.map((row) => row.kind))].join(", ");
       console.warn(
-        `PPMChildDatabase: ${refused.length} "${moduleName}" change(s) were refused by the database and cannot be ` +
-          `retried. Refreshing anyway - the database copy is the real one. Run ` +
-          `PPMChildDatabase.pendingWrites("${moduleName}") to see what was rejected, then ` +
-          `PPMChildDatabase.clearPending("${moduleName}") once you have noted it.`
+        `PPMChildDatabase: ${unsaved.length} "${moduleName}" change(s) did not save (${kinds}). Refreshing from the ` +
+          `database anyway - it holds the only copy. Run PPMChildDatabase.pendingWrites("${moduleName}") to see them, ` +
+          `then PPMChildDatabase.clearPending("${moduleName}") once you have.`
       );
-    }
-
-    const stillBlocking = pendingFor(moduleName).filter(
-      (row) => row.kind !== "conflict" && row.kind !== "refused"
-    );
-    if (stillBlocking.length && !options?.force) {
-      console.warn(
-        `PPMChildDatabase: not refreshing "${moduleName}" from the database - ${stillBlocking.length} unsaved change(s) are pending. ` +
-          `Run PPMChildDatabase.pendingWrites("${moduleName}") to inspect them.`
-      );
-      return { module: moduleName, ok: true, skipped: true, pending: stillBlocking.length };
     }
 
     const activeRows = result.rows.filter((row) => !row.deleted_at);
     const store = regroup(moduleName, activeRows);
-    rawSet(moduleDefinition(moduleName).localKey, JSON.stringify(store));
+    adopt(moduleName, store);
     hydrated = true;
     return { module: moduleName, ok: true, records: activeRows.length, deleted: result.rows.length - activeRows.length };
   }
@@ -2466,26 +2468,6 @@
 
   function baselinePayload(item) {
     return stableStringify(normaliseForCompare(item.record));
-  }
-
-  function diffStore(moduleName, rawStore, base) {
-    const current = flattenStore(moduleName, rawStore);
-    const byKey = new Map(current.map((item) => [compositeKey(item), item]));
-    const saves = [];
-    const deletes = [];
-
-    current.forEach((item) => {
-      const key = compositeKey(item);
-      const prior = base.get(key);
-      const payload = baselinePayload(item);
-      if (!prior || prior.deleted || prior.payload !== payload) saves.push({ key, item, prior, payload });
-    });
-
-    base.forEach((prior, key) => {
-      if (!prior.deleted && !byKey.has(key)) deletes.push({ key, prior });
-    });
-
-    return { current, saves, deletes };
   }
 
   async function saveChildRecord(moduleName, operation) {
@@ -2859,12 +2841,33 @@
       };
     }
 
-    return saveChildRecord(moduleName, {
-      key: found.key,
-      item: found.item,
-      prior,
-      payload: found.payload
-    });
+    return recordOutcome(
+      await saveChildRecord(moduleName, {
+        key: found.key,
+        item: found.item,
+        prior,
+        payload: found.payload
+      })
+    );
+  }
+
+  /*
+    Puts the outcome of a row-level write in the pending ledger, or takes it out again.
+
+    This was missing, and had been since Stage 16. recordProblem() was only ever called from
+    syncStore() and appendOnlySync() - the collection-level path the write-through used - so once
+    that path stopped being reached, no failed write was recorded anywhere durable. pendingWrites()
+    returned an empty list however much had gone wrong, which is worse than not having it: it is a
+    diagnostic that answers "nothing failed" when things have.
+
+    The offline queue in ppm-data.js was unaffected and kept the amber banner honest, but a
+    refusal or a conflict left no trace at all once the message had been dismissed.
+  */
+  function recordOutcome(result) {
+    if (!result) return result;
+    if (result.status === "saved") clearPendingEntry(result.module, result.key, result.operation);
+    else recordProblem(result);
+    return result;
   }
 
   async function removeOne(moduleName, record, options) {
@@ -2896,161 +2899,7 @@
     if (!prior || prior.deleted)
       return { module: moduleName, key: found.key, operation: "delete", status: "saved", at: new Date().toISOString(), message: "Already absent from the database." };
 
-    return softDeleteChildRecord(moduleName, { key: found.key, prior });
-  }
-
-  async function appendOnlySync(moduleName, rawStore) {
-    let base;
-    try {
-      base = await ensureBaseline(moduleName);
-    } catch (error) {
-      const result = {
-        module: moduleName,
-        key: "(collection)",
-        operation: "sync",
-        status: "failed",
-        at: new Date().toISOString(),
-        message: `Could not load the database baseline: ${error?.message || error}`
-      };
-      recordProblem(result);
-      console.error("PPMChildDatabase:", result.message);
-      return { module: moduleName, appendOnly: true, saved: [], conflicts: [], refused: [], failed: [result] };
-    }
-
-    const diff = diffStore(moduleName, rawStore, base);
-    const outcome = { module: moduleName, appendOnly: true, saved: [], conflicts: [], refused: [], failed: [] };
-    const appends = diff.saves.filter((entry) => !entry.prior);
-    const rewrites = diff.saves.filter((entry) => entry.prior);
-
-    for (const entry of appends) {
-      const result = await saveChildRecord(moduleName, entry);
-      if (result.status === "saved") {
-        outcome.saved.push(result);
-        clearPendingEntry(moduleName, result.key);
-      } else {
-        const bucket =
-          result.status === "conflict" ? "conflicts" : result.status === "refused" ? "refused" : "failed";
-        outcome[bucket].push(result);
-        recordProblem(result);
-      }
-    }
-
-    const blocked = [
-      ...rewrites.map((entry) => ({ key: entry.key, operation: "change-blocked" })),
-      ...diff.deletes.map((entry) => ({ key: entry.key, operation: "removal-blocked" }))
-    ];
-
-    blocked.forEach((entry) => {
-      const result = {
-        module: moduleName,
-        key: entry.key,
-        operation: entry.operation,
-        status: "refused",
-        at: new Date().toISOString(),
-        message:
-          entry.operation === "removal-blocked"
-            ? `${entry.key} is recorded project status history and cannot be removed. The database copy was restored.`
-            : `${entry.key} is recorded project status history and cannot be changed once reported. Record a new project status instead. The database copy was restored.`
-      };
-      outcome.refused.push(result);
-      recordProblem(result);
-    });
-
-    if (blocked.length) {
-      // force: the refusals just logged above are themselves blocking pending entries.
-      const restored = await hydrateModule(moduleName, { force: true });
-      if (!restored.ok)
-        console.error(
-          `PPMChildDatabase: "${moduleName}" is append-only and a change was refused, but the database copy could not be restored. Reload the page before trusting what is on screen.`,
-          restored.error
-        );
-    }
-
-    if (outcome.refused.length || outcome.conflicts.length || outcome.failed.length) {
-      const problems = outcome.refused.length + outcome.conflicts.length + outcome.failed.length;
-      console.group(`PPMChildDatabase: ${problems} ${moduleName} write(s) did not reach the database`);
-      [...outcome.conflicts, ...outcome.refused, ...outcome.failed].forEach((row) =>
-        console.warn(row.key, "-", row.message)
-      );
-      console.log(`Run PPMChildDatabase.pendingWrites("${moduleName}") for details.`);
-      console.groupEnd();
-    } else if (outcome.saved.length) {
-      console.info(`PPMChildDatabase: ${outcome.saved.length} ${moduleName} record(s) appended to the database.`);
-    }
-
-    return outcome;
-  }
-
-  async function syncStore(moduleName, rawStore) {
-    if (APPEND_ONLY_MODULES.has(moduleName)) return appendOnlySync(moduleName, rawStore);
-
-    let base;
-    try {
-      base = await ensureBaseline(moduleName);
-    } catch (error) {
-      const result = {
-        module: moduleName,
-        key: "(collection)",
-        operation: "sync",
-        status: "failed",
-        at: new Date().toISOString(),
-        message: `Could not load the database baseline: ${error?.message || error}`
-      };
-      recordProblem(result);
-      console.error("PPMChildDatabase:", result.message);
-      return { module: moduleName, saved: [], conflicts: [], refused: [], failed: [result] };
-    }
-
-    const diff = diffStore(moduleName, rawStore, base);
-    const outcome = { module: moduleName, saved: [], conflicts: [], refused: [], failed: [] };
-    const operations = [
-      ...diff.saves.map((entry) => ({ type: "save", entry })),
-      ...diff.deletes.map((entry) => ({ type: "delete", entry }))
-    ];
-
-    for (const operation of operations) {
-      const result =
-        operation.type === "delete"
-          ? await softDeleteChildRecord(moduleName, operation.entry)
-          : await saveChildRecord(moduleName, operation.entry);
-
-      if (result.status === "saved") {
-        outcome.saved.push(result);
-        clearPendingEntry(moduleName, result.key);
-      } else {
-        const bucket =
-          result.status === "conflict" ? "conflicts" : result.status === "refused" ? "refused" : "failed";
-        outcome[bucket].push(result);
-        recordProblem(result);
-      }
-    }
-
-    const problems = outcome.conflicts.length + outcome.refused.length + outcome.failed.length;
-    if (problems) {
-      console.group(`PPMChildDatabase: ${problems} ${moduleName} write(s) did not reach the database`);
-      [...outcome.conflicts, ...outcome.refused, ...outcome.failed].forEach((row) =>
-        console.warn(row.key, "-", row.message)
-      );
-      console.log(`Run PPMChildDatabase.pendingWrites("${moduleName}") for details.`);
-      console.groupEnd();
-    } else if (outcome.saved.length) {
-      console.info(`PPMChildDatabase: ${outcome.saved.length} ${moduleName} change(s) saved to the database.`);
-    }
-    return outcome;
-  }
-
-  function enqueueSync(moduleName, rawStore) {
-    const previous = writeQueues.get(moduleName) || Promise.resolve();
-    const next = previous.catch(() => {}).then(() => syncStore(moduleName, rawStore));
-    writeQueues.set(moduleName, next);
-    return next;
-  }
-
-  function flush(moduleName) {
-    return (
-      writeQueues.get(moduleName) ||
-      Promise.resolve({ module: moduleName, saved: [], conflicts: [], refused: [], failed: [] })
-    );
+    return recordOutcome(await softDeleteChildRecord(moduleName, { key: found.key, prior }));
   }
 
   function emptyStoreFor(definition) {
@@ -3058,13 +2907,27 @@
     return {};
   }
 
-  function syncFromRawValue(moduleName, value) {
-    const definition = moduleDefinition(moduleName);
-    const rawStore = parseJson(value, emptyStoreFor(definition));
-    enqueueSync(moduleName, rawStore).catch((error) =>
-      console.error(`PPMChildDatabase: unexpected write-through failure for "${moduleName}".`, error)
-    );
-  }
+  /* =================================== Stage 16: the collection-level sync is gone too
+
+     WHAT WAS HERE
+
+     diffStore(), syncStore(), appendOnlySync(), enqueueSync(), syncFromRawValue() and flush() -
+     around two hundred lines that took a whole collection, diffed it against the database
+     baseline and wrote every row that had changed. It was the engine behind the write-through:
+     the patched Storage.prototype.setItem handed the new value to syncFromRawValue(), which
+     queued a sync, and flush() awaited it.
+
+     Deleting the patch left every one of them unreachable. Nothing called syncFromRawValue, so
+     nothing populated the queue, so flush() returned an empty outcome to anyone who awaited it -
+     including two workflow commits and the scenario publisher, where `await flush(...)` read as
+     "make sure pending writes have landed" and did nothing whatsoever.
+
+     That is the same defect as the unreachable governance workflows in Stage 17, and dead code
+     that reads as a safeguard is worse than dead code that reads as dead. Row-level writes -
+     saveOne() and removeOne() - do this work now, one record at a time, each returning what
+     happened.
+
+  */
 
   /* ============================================ Stage 16: the write-through is gone
 
@@ -3246,12 +3109,15 @@
     if (!["request", "approve_initial", "approve_request", "reject_request"].includes(operation))
       throw new Error(`Unknown baseline workflow operation: ${operation || "(blank)"}.`);
 
-    /* Project-plan changes are already database-authoritative from Stage 10C.
-       Flush them before an initial approval so the approved snapshot is based on
-       exactly the plan version this browser most recently saved. */
-    await flush("plans");
-    await Promise.all(BASELINE_WORKFLOW_MODULES.map((name) => flush(name)));
-
+    /*
+      Five `await flush(...)` calls used to sit above the pending checks in this file, one per
+      workflow, described as finishing any queued write-through so that PostgreSQL approved
+      exactly what the user had just saved. They stopped doing anything when the write-through
+      was deleted, and nothing noticed, because the check underneath them is what was ever load
+      bearing: every write is now awaited by its own caller and has already finished or already
+      failed by the time a workflow runs, and anything that failed is sitting in the ledger these
+      lines read.
+    */
     const pending = ["plans", ...BASELINE_WORKFLOW_MODULES].flatMap((name) => pendingFor(name));
     if (pending.length)
       throw new Error(
@@ -3324,11 +3190,6 @@
     if (!projectCode) throw new Error("The financial workflow has no project identifier.");
     if (!["request", "approve", "reject"].includes(operation))
       throw new Error(`Unknown financial workflow operation: ${operation || "(blank)"}.`);
-
-    // A save immediately before Request can still be in the generic write-through
-    // queue. Finish those writes first so PostgreSQL approves exactly the rows the
-    // user just saved, not an earlier browser snapshot.
-    await Promise.all(FINANCIAL_WORKFLOW_MODULES.map((name) => flush(name)));
 
     const pending = FINANCIAL_WORKFLOW_MODULES.flatMap((name) => pendingFor(name));
     if (pending.length)
@@ -3417,7 +3278,6 @@
 
   async function resourceDemandVersionSnapshot() {
 
-    await flush("resourceDemand");
     const pending = pendingFor("resourceDemand");
     if (pending.length)
       throw new Error(
@@ -3448,10 +3308,6 @@
     if (!scenarioId) throw new Error("The resource-scenario workflow has no scenario identifier.");
     if (!["publish", "reject"].includes(operation))
       throw new Error(`Unknown resource-scenario workflow operation: ${operation || "(blank)"}.`);
-
-    // Draft edits use ordinary row-level write-through. Finish those writes first
-    // so the workflow version check refers to the exact scenario the user can see.
-    await Promise.all(RESOURCE_WORKFLOW_MODULES.map((name) => flush(name)));
 
     const pending = RESOURCE_WORKFLOW_MODULES.flatMap((name) => pendingFor(name));
     if (pending.length)
@@ -3585,44 +3441,47 @@
     return { ok: failed.length === 0, rows };
   }
 
+  /*
+    Inserts a throwaway record, checks the database accepted it, then removes it again.
+
+    It used to write the probe into localStorage and call flush(), because that is how a write
+    reached PostgreSQL when Storage.prototype.setItem was patched. That patch went in Stage 16 and
+    flush() became a no-op, so the probe had been silently reporting "insert did not save" for
+    every collection ever since - a self test that could only fail. Nobody ran it, which is the
+    only reason it went unnoticed, and is its own lesson about diagnostics.
+
+    It now does what it claims: a real save and a real remove through the one write seam, checking
+    what each returns.
+  */
   async function writeProbe(moduleName) {
     const definition = moduleDefinition(moduleName);
+    if (!window.PPMStore) return { ok: false, reason: "ppm-data.js is not loaded" };
+
     const probeKey = `SELFTEST-${Date.now()}`;
-    const scopeGroup = usesScopeKey(definition)
-      ? definition.scopeKind === "programme"
-        ? Object.keys(rawRead(definition.localKey, {}) || {})[0] || ""
-        : SINGLETON_KEY
-      : "";
-
-    if (definition.scopeKind === "programme" && !scopeGroup)
-      return { ok: true, reason: "no programme available to probe" };
-
-    const store = rawRead(definition.localKey, emptyStoreFor(definition));
     const record = { [definition.idField]: probeKey, name: "Self test probe", selfTest: true };
 
-    const next =
-      definition.shape === "array"
-        ? [...(Array.isArray(store) ? store : []), record]
-        : { ...(store || {}), [scopeGroup]: [...((store || {})[scopeGroup] || []), record] };
+    /* Programme-scoped collections are filed under a programme id, so the probe needs a real one
+       to sit under. With no programmes loaded there is nothing to probe and saying so beats
+       inventing a programme. */
+    const options = {};
+    if (definition.scopeKind === "programme") {
+      const groups = Object.keys(held(moduleName) || {});
+      if (!groups.length) return { ok: true, reason: "no programme available to probe" };
+      options.storageGroup = groups[0];
+    }
 
     try {
-      localStorage.setItem(definition.localKey, JSON.stringify(next));
-      let outcome = await flush(moduleName);
-      if (outcome.saved.length !== 1)
-        return { ok: false, reason: `insert did not save (${JSON.stringify(outcome).slice(0, 120)})` };
+      const inserted = await PPMStore.save(moduleName, record, options);
+      if (!inserted.ok) return { ok: false, reason: `insert did not save: ${inserted.reason} - ${inserted.message}` };
 
-      const cleaned =
-        definition.shape === "array"
-          ? next.filter((item) => item?.[definition.idField] !== probeKey)
-          : {
-              ...next,
-              [scopeGroup]: (next[scopeGroup] || []).filter((item) => item?.[definition.idField] !== probeKey)
-            };
-
-      localStorage.setItem(definition.localKey, JSON.stringify(cleaned));
-      outcome = await flush(moduleName);
-      if (outcome.saved.length !== 1)
-        return { ok: false, reason: `soft delete did not save (${JSON.stringify(outcome).slice(0, 120)})` };
+      const removed = await PPMStore.remove(moduleName, record, options);
+      if (!removed.ok) {
+        return {
+          ok: false,
+          reason: `the probe record was inserted but could not be removed (${removed.reason} - ${removed.message}). ` +
+            `Delete ${probeKey} by hand.`
+        };
+      }
 
       return { ok: true };
     } catch (error) {
@@ -3680,7 +3539,6 @@
         "  await PPMChildDatabase.compareAll()      // the same, for everything\n\n" +
         "Unsaved or failed writes:\n" +
         "  PPMChildDatabase.pendingWrites()         // every write that did not land\n" +
-        '  await PPMChildDatabase.flush("plans")    // retry pending writes for one collection\n' +
         '  PPMChildDatabase.clearPending("plans")   // give up on them\n\n' +
         "End-to-end check (hydrate, compare, pending; add { write: true } to probe a real write):\n" +
         "  await PPMChildDatabase.selfTest()\n\n" +
@@ -3733,7 +3591,6 @@
     // pending writes
     pendingWrites,
     clearPending,
-    flush,
 
     /*
       Diagnostics. Kept after the Stage 14 cleanup because they are how a failed

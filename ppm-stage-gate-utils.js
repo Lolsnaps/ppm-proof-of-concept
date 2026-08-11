@@ -1,10 +1,15 @@
 (function () {
   "use strict";
 
-  const STORAGE_KEY = "ppmStageGates";
-  const PROJECT_KEY = "ppmProjects";
-  const ACTION_KEY = "ppmProjectActions";
-  const DECISION_KEY = "ppmProjectDecisions";
+  /*
+    Stage 16: collections, not storage keys. These four were the localStorage keys this module
+    read and wrote; they are now what PPMStore and both adapters call the same data, so the
+    workflow capture below keys its snapshot by collection too and nothing is translated.
+  */
+  const GATES = "stageGates";
+  const PROJECTS = "projects";
+  const ACTIONS = "actions";
+  const DECISIONS = "decisions";
   const STATUSES = [
     "Draft",
     "Submitted",
@@ -31,18 +36,18 @@
 
   const clone = PPMCore.clone;
 
-  const parseJson = (value, fallback) => PPMCore.parseJson(value, fallback, "stage-gate data");
-
   /*
-    Every key this module touches (ppmStageGates, ppmProjects, ppmProjectActions,
-    ppmProjectDecisions, ppmAuditHistory) is project-scoped data, so it uses the
-    permission-filtered view. Writes go back through the same filter, which
-    merges records the user cannot see so nothing is lost on save.
+    Every collection this module touches is project-scoped data.
+
+    That used to mean reading through PPMAuth's permission-filtered view of localStorage and
+    writing back through the same filter, which merged in the records the user could not see so
+    that a save did not discard them. Stage 16 removed the need: the store holds whatever RLS
+    allowed this person to load, and writes are row by row, so records outside their access are
+    never read, never written, and cannot be lost by anything happening here.
   */
-  function rawRead(key, fallback) {
-    if (workflowCapture?.stores?.has(key)) return clone(workflowCapture.stores.get(key));
-    if (window.PPMAuth?.readScoped) return window.PPMAuth.readScoped(key, fallback);
-    return parseJson(localStorage.getItem(key), fallback);
+  function rawRead(collection, fallback) {
+    if (workflowCapture?.stores?.has(collection)) return clone(workflowCapture.stores.get(collection));
+    return window.PPMStore ? window.PPMStore[collection].read() : fallback;
   }
 
   /*
@@ -58,9 +63,9 @@
     through the one seam like everything else. It used to go through PPMAuth.writeScoped into
     the patched localStorage, which returned before the database had been asked anything.
   */
-  async function rawWrite(key, value) {
+  async function rawWrite(collection, value) {
     if (workflowCapture) {
-      workflowCapture.stores.set(key, clone(value));
+      workflowCapture.stores.set(collection, clone(value));
       return { ok: true, captured: true, value };
     }
     if (!window.PPMStore) {
@@ -70,10 +75,6 @@
         message: "The data layer is not loaded on this page, so nothing was saved.",
         queued: false
       };
-    }
-    const collection = window.PPMStore.collectionFor(key);
-    if (!collection) {
-      return { ok: false, reason: "invalid", message: `No collection is registered for "${key}".`, queued: false };
     }
     return window.PPMStore.replaceAll(collection, value);
   }
@@ -165,7 +166,7 @@
   }
 
   function getProjectsRaw() {
-    const rows = rawRead(PROJECT_KEY, []);
+    const rows = rawRead(PROJECTS, []);
     return Array.isArray(rows) ? rows.filter(Boolean) : [];
   }
 
@@ -192,7 +193,7 @@
 
   function personFromResourceId(resourceId, fallback) {
     const id = clean(resourceId);
-    const resources = window.PPMAuth?.getResources?.() || rawRead("ppmResources", []);
+    const resources = window.PPMAuth?.getResources?.() || rawRead("people", []);
     const resource = Array.isArray(resources) ? resources.find((item) => item?.resourceId === id) : null;
     return normalisePerson(resource || {}, fallback || { resourceId: id });
   }
@@ -441,7 +442,7 @@
   }
 
   function readStoreRaw() {
-    const stored = rawRead(STORAGE_KEY, {});
+    const stored = rawRead(GATES, {});
     if (Array.isArray(stored)) {
       return stored.reduce((groups, source) => {
         const gate = normaliseGate(source);
@@ -621,7 +622,7 @@
         errors.push("At least one required approver is needed before submission.");
       if (gate.requiredApprovers.some((approver) => !approver.resourceId))
         errors.push("Every required approver must be selected from Resources.");
-      const resources = window.PPMAuth?.getResources?.() || rawRead("ppmResources", []);
+      const resources = window.PPMAuth?.getResources?.() || rawRead("people", []);
       const unauthorisedApprover = gate.requiredApprovers.find((approver) => {
         const resource = Array.isArray(resources)
           ? resources.find((item) => item?.resourceId === approver.resourceId)
@@ -724,7 +725,7 @@
     if (store[removeFrom])
       store[removeFrom] = store[removeFrom].filter((item) => item.gateId !== gate.gateId);
     (store[gate.projectCode] ||= []).push(normaliseGate(gate));
-    rawWrite(STORAGE_KEY, store);
+    rawWrite(GATES, store);
   }
 
   async function save(gateSource) {
@@ -840,7 +841,7 @@
 
     /* Awaited: the gate is only reported deleted, and the change only announced, once the
        database has accepted it. */
-    const removed = await rawWrite(STORAGE_KEY, store);
+    const removed = await rawWrite(GATES, store);
     if (removed && removed.ok === false) throw new Error(removed.message);
 
     dispatchChange("deleted", existing);
@@ -910,8 +911,8 @@
     return [...new Set(transitions)];
   }
 
-  function nextRecordId(key, prefix, idField) {
-    const store = rawRead(key, {});
+  function nextRecordId(collection, prefix, idField) {
+    const store = rawRead(collection, {});
     const rows = Array.isArray(store)
       ? store
       : Object.values(store || {})
@@ -924,11 +925,11 @@
     return `${prefix}-${String(maximum + 1).padStart(4, "0")}`;
   }
 
-  function addGroupedRecord(key, projectCode, record) {
-    const stored = rawRead(key, {});
+  function addGroupedRecord(collection, projectCode, record) {
+    const stored = rawRead(collection, {});
     const store = stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
     (store[projectCode] ||= []).push(record);
-    rawWrite(key, store);
+    rawWrite(collection, store);
   }
 
   function createActions(gate) {
@@ -936,7 +937,7 @@
     gate.actionsArising
       .filter((item) => !item.actionId)
       .forEach((item) => {
-        const actionId = nextRecordId(ACTION_KEY, "ACT", "actionId");
+        const actionId = nextRecordId(ACTIONS, "ACT", "actionId");
         const record = {
           actionId,
           projectCode: gate.projectCode,
@@ -958,7 +959,7 @@
           createdAt: nowIso(),
           updatedAt: nowIso()
         };
-        addGroupedRecord(ACTION_KEY, gate.projectCode, record);
+        addGroupedRecord(ACTIONS, gate.projectCode, record);
         item.actionId = actionId;
         created.push(actionId);
       });
@@ -979,7 +980,7 @@
   }
 
   function createDecision(gate) {
-    const decisionId = gate.linkedDecisionId || nextRecordId(DECISION_KEY, "DEC", "decisionId");
+    const decisionId = gate.linkedDecisionId || nextRecordId(DECISIONS, "DEC", "decisionId");
     const primaryApprover = gate.requiredApprovers[0] || {};
     const routeDecision =
       gate.routeRequirement === "Not Applicable" &&
@@ -1031,7 +1032,7 @@
       createdAt: nowIso(),
       updatedAt: nowIso()
     };
-    const stored = rawRead(DECISION_KEY, {});
+    const stored = rawRead(DECISIONS, {});
     const store = stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
     const rows = Array.isArray(store[gate.projectCode]) ? store[gate.projectCode] : [];
     const existingIndex = rows.findIndex((item) => item?.decisionId === decisionId);
@@ -1041,7 +1042,7 @@
       rows[existingIndex] = { ...rows[existingIndex], ...record };
     } else rows.push(record);
     store[gate.projectCode] = rows;
-    rawWrite(DECISION_KEY, store);
+    rawWrite(DECISIONS, store);
     gate.linkedDecisionId = decisionId;
     return decisionId;
   }
@@ -1079,7 +1080,7 @@
     project.stageHistory = history;
     project.updatedAt = nowIso();
     projects[index] = project;
-    rawWrite(PROJECT_KEY, projects);
+    rawWrite(PROJECTS, projects);
   }
 
   function transitionLocal(gateId, toStatus, details) {
@@ -1284,7 +1285,7 @@
     });
     if (samePerson(actor, routeApprover))
       throw new Error("The person requesting a governance-route exception cannot approve it.");
-    const routeResources = window.PPMAuth?.getResources?.() || rawRead("ppmResources", []);
+    const routeResources = window.PPMAuth?.getResources?.() || rawRead("people", []);
     const routeApproverResource =
       window.PPMAuth?.getResource?.(routeApprover.resourceId) ||
       (Array.isArray(routeResources)
@@ -1446,14 +1447,13 @@
     if (workflowCapture) return callback();
 
     return (async () => {
-    // Capture every local mutation first. Nothing is written to localStorage, no
-    // audit entry is emitted and no change event is dispatched until PostgreSQL
-    // has committed the whole workflow transaction.
+    // Capture every local mutation first. Nothing is saved, no audit entry is emitted and no
+    // change event is dispatched until PostgreSQL has committed the whole workflow transaction.
     const before = {
-      gates: rawRead(STORAGE_KEY, {}),
-      actions: rawRead(ACTION_KEY, {}),
-      decisions: rawRead(DECISION_KEY, {}),
-      projects: rawRead(PROJECT_KEY, [])
+      gates: rawRead(GATES, {}),
+      actions: rawRead(ACTIONS, {}),
+      decisions: rawRead(DECISIONS, {}),
+      projects: rawRead(PROJECTS, [])
     };
     const capture = { stores: new Map(), events: [] };
     workflowCapture = capture;
@@ -1471,14 +1471,14 @@
     const beforeGate = findById(groupedRows(before.gates, projectCode), "gateId", gateId);
     if (!beforeGate) throw new Error(`${gateId || "The stage gate"} is not present in the loaded database snapshot.`);
 
-    const afterActions = capture.stores.get(ACTION_KEY) || before.actions;
-    const afterDecisions = capture.stores.get(DECISION_KEY) || before.decisions;
-    const afterProjects = capture.stores.get(PROJECT_KEY) || before.projects;
+    const afterActions = capture.stores.get(ACTIONS) || before.actions;
+    const afterDecisions = capture.stores.get(DECISIONS) || before.decisions;
+    const afterProjects = capture.stores.get(PROJECTS) || before.projects;
     const actions = changedRows(before.actions, afterActions, projectCode, "actionId");
     const decision = calculatedGate.linkedDecisionId
       ? findById(groupedRows(afterDecisions, projectCode), "decisionId", calculatedGate.linkedDecisionId)
       : null;
-    const projectChanged = capture.stores.has(PROJECT_KEY);
+    const projectChanged = capture.stores.has(PROJECTS);
     const project = projectChanged
       ? (Array.isArray(afterProjects)
           ? afterProjects.find((row) => lower(row?.projectCode) === lower(projectCode))
@@ -1567,7 +1567,6 @@
   }
 
   window.PPMStageGates = {
-    STORAGE_KEY,
     STATUSES: [...STATUSES],
     ROUTE_REQUIREMENTS: [...ROUTE_REQUIREMENTS],
     ROUTE_APPROVAL_STATUSES: [...ROUTE_APPROVAL_STATUSES],

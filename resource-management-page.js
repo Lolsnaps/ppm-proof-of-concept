@@ -1,6 +1,5 @@
 "use strict";
 
-const VIEW_STORAGE_KEY = "ppmResourceGanttViews";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RESOURCE_NAME_WIDTH = 234;
 const RESOURCE_METRIC_WIDTH = 82;
@@ -18,8 +17,6 @@ let selectedResourceIds = new Set();
 let timelineBuckets = [];
 let visibleResourceColumns = new Set(["current", "peak", "over"]);
 let ganttExpanded = false;
-
-const parseStoredJson = (key, fallback) => PPMCore.readJson(key, fallback);
 
 const escapeHtml = PPMCore.escapeHtml;
 
@@ -94,8 +91,8 @@ function loadData() {
     resources.forEach((resource) => selectedResourceIds.add(resource.resourceId));
   }
 
-  const projects = parseStoredJson("ppmProjects", []);
-  const projectPlans = parseStoredJson("ppmProjectPlans", {});
+  const projects = PPMStore.projects.all();
+  const projectPlans = PPMStore.plans.read();
   const projectMap = new Map(
     (Array.isArray(projects) ? projects : []).map((project) => [project.projectCode, project])
   );
@@ -534,9 +531,16 @@ function renderGantt() {
   ).length;
 }
 
+/*
+  Stage 16: saved resource views are a database collection, not browser state.
+
+  resourceGanttViews is one of the collections the child adapter owns and hydrates. This page wrote it with
+  localStorage.setItem, which reached PostgreSQL only through the prototype patch; once that was
+  removed the view was saved to this browser and nowhere else, and the next hydration replaced it
+  with the database's copy - so saving or deleting a view appeared to work and did not last.
+*/
 function getSavedViews() {
-  const views = parseStoredJson(VIEW_STORAGE_KEY, []);
-  return Array.isArray(views) ? views : [];
+  return PPMStore.resourceGanttViews.all();
 }
 
 function renderColumnOptions() {
@@ -604,7 +608,7 @@ function showMessage(text, type) {
   message.className = `message ${type}`;
 }
 
-function saveView() {
+async function saveView() {
   const name = document.getElementById("viewName").value.trim();
   if (!name) {
     showMessage("Enter a name for this resource view.", "error");
@@ -616,7 +620,11 @@ function saveView() {
   const view = currentView(name, selectedId || undefined);
   if (existingIndex >= 0) views[existingIndex] = view;
   else views.push(view);
-  localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(views));
+  const saved = await PPMStore.resourceGanttViews.replaceAll(views);
+  if (!saved.ok) {
+    showMessage(saved.message, saved.queued ? "warning" : "error");
+    return;
+  }
   populateSavedViews(view.viewId);
   showMessage(
     `${name} was ${view.scope === "shared" ? "published as a shared view" : "saved as a personal view"}. Grouping, selected resources and visible columns were retained.`,
@@ -668,9 +676,13 @@ function deleteView() {
   completeDeleteView(viewId, view);
 }
 
-function completeDeleteView(viewId, view) {
+async function completeDeleteView(viewId, view) {
   const views = getSavedViews();
-  localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(views.filter((item) => item.viewId !== viewId)));
+  const saved = await PPMStore.resourceGanttViews.replaceAll(views.filter((item) => item.viewId !== viewId));
+  if (!saved.ok) {
+    showMessage(saved.message, saved.queued ? "warning" : "error");
+    return;
+  }
   document.getElementById("viewName").value = "";
   populateSavedViews();
   showMessage(`${view.name} was deleted.`, "success");

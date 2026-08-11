@@ -1,22 +1,18 @@
 "use strict";
 
-const MILESTONE_KEY = "ppmProgrammeMilestones";
-const RAID_KEY = "ppmProgrammeRaid";
+
 let programmes = PPMGovernance.getProgrammes();
-let programmeMilestones = parseStore(MILESTONE_KEY, {});
-let programmeRaid = parseStore(RAID_KEY, {});
+let programmeMilestones = parseStore("programmeMilestones", {});
+let programmeRaid = parseStore("programmeRaid", {});
 let editingProgrammeId = "";
 let pendingConfirmation = null;
 
-function parseStore(key, fallback) {
-  const value = localStorage.getItem(key);
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value);
-  } catch (error) {
-    console.error(`${key} could not be loaded.`, error);
-    return fallback;
-  }
+/* Stage 16: read from PPMStore in the collection's registered shape, rather than parsing the
+   localStorage mirror. Programme milestones and RAID are keyed by "programme:<id>". */
+function parseStore(collection, fallback) {
+  if (!window.PPMStore) return fallback;
+  const value = PPMStore[collection].read();
+  return value === null || value === undefined ? fallback : value;
 }
 // Cells tracked in the programme change history.
 const PROGRAMME_AUDIT_FIELDS = [
@@ -71,7 +67,7 @@ function formatMoney(value) {
     : "Not set";
 }
 function getProjects() {
-  const projects = parseStore("ppmProjects", []);
+  const projects = parseStore("projects", []);
   return Array.isArray(projects) ? projects : [];
 }
 function programmeProjects(programme) {

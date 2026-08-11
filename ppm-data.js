@@ -84,6 +84,47 @@
     return window.PPMDatabase || null;
   }
 
+  /*
+    THE COPY BOUNDARY, AND WHY IT IS NOT AN OPTIMISATION TO REMOVE
+
+    Nothing crosses in or out of the store by reference. A caller gets its own copy; a record
+    handed to save() is copied before it is kept.
+
+    The reason is the whole point of this stage. The store is only updated once PostgreSQL has
+    confirmed the write - that is what stops the screen showing a state the database refused. Hand
+    out the live object instead and any caller can defeat that with an ordinary line of code:
+
+        var projects = PPMStore.projects.read();
+        projects[0].status = "Closed";        // the store now disagrees with the database
+                                              // silently, and every later read repeats the lie
+
+    No error, no write, no answer to check - which is precisely the shape of defect the write
+    seams produced and this module exists to remove. Sorting in place, splicing a row out before
+    a save, or keeping a reference and editing it later all do the same damage by accident.
+
+    JSON round-trip rather than structuredClone, deliberately. Every one of these records came
+    from PostgreSQL as JSON and the reads being migrated all went through JSON.parse of a
+    localStorage string, so this reproduces exactly the shape callers already handle - undefined
+    dropped, dates left as strings. structuredClone would hand back live Date objects that the
+    old path never produced, which is a behaviour change disguised as a performance improvement.
+
+    Cost: a parse and a stringify per read. The path being replaced did a JSON.parse of the whole
+    collection on every single read, so this is no worse than what it removes, on a portfolio of
+    hundreds of rows rather than millions.
+  */
+  function copy(value) {
+    if (value === null || value === undefined) return value;
+    if (typeof value !== "object") return value;
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (error) {
+      /* Circular or otherwise unserialisable. It cannot have come from the database, so refusing
+         to hand it on is safer than handing on the original by reference. */
+      console.error("PPMStore: a stored value could not be copied and has been treated as empty.", error);
+      return Array.isArray(value) ? [] : {};
+    }
+  }
+
   /* ------------------------------------------------------------------ registry
 
      Built from the adapters' own module definitions rather than a list typed here. A hand
@@ -147,28 +188,32 @@
 
   /* --------------------------------------------------------------------- store
 
-     THE HYDRATION BRIDGE, AND WHEN IT GOES
+     WHERE THE DATA COMES FROM
 
-     Hydration still writes the collections into localStorage through PPMAuth.rawSet, and the
-     reads on twenty pages still come from there. Until those reads are migrated, this store is
-     filled from that mirror on first use. That is a bridge, not the design: it is why reads
-     here can be trusted to agree with what a page reads directly, during the window where both
-     exist.
+     Hydration. Both adapters load their collections from PostgreSQL and hand each one here
+     through adopt(). Nothing else fills the store, and there is no second copy anywhere.
 
-     When the read migration finishes, hydration fills this store directly and the mirror is
-     deleted. The gate that forbids business keys in localStorage is what makes that final.
+     There used to be one: hydration wrote each collection into localStorage under its legacy key
+     and twenty pages read it back. That mirror is gone. It was never the data - it was a copy of
+     the data whose only guarantee was that hydration had happened at some point, in some tab -
+     and it was absent before hydration finished, stale when a change was pending, and
+     indistinguishable at the call site from the real thing.
+
+     ppm-page-loader.js is what makes the store sufficient on its own: it waits for both adapters'
+     ready promises before loading a single page script, so by the time anything reads, hydration
+     has finished. That was already true while the mirror existed; the mirror was simply never
+     the reason reads worked.
+
+     A collection that hydration could not load is empty here, and empty is the honest answer -
+     the alternative is showing a copy from some earlier visit and calling it current.
   */
-  function readMirror(name) {
-    var key = localKeyOf(name);
-    if (!key) return null;
-    var auth = window.PPMAuth;
-    var raw = auth && typeof auth.rawRead === "function" ? auth.rawRead(key, null) : null;
-    if (raw !== null && raw !== undefined) return raw;
-    try {
-      return JSON.parse(window.localStorage.getItem(key));
-    } catch (error) {
-      return null;
+  function adopt(name, value) {
+    if (!entry(name)) {
+      console.warn('PPMStore: "' + name + '" is not a collection, so hydration for it was ignored.');
+      return false;
     }
+    store.set(name, value === null || value === undefined ? emptyFor(name) : value);
+    return true;
   }
 
   function emptyFor(name) {
@@ -179,36 +224,120 @@
     return [];
   }
 
-  function read(name) {
+  /*
+    The canonical object. Internal only - the three functions that maintain the store need to
+    change it in place, and everything else must go through read(), which copies. Handing this
+    out is the mistake the copy boundary above exists to prevent.
+  */
+  function live(name) {
     if (!entry(name)) return null;
-    if (!store.has(name)) {
-      var mirrored = readMirror(name);
-      store.set(name, mirrored === null || mirrored === undefined ? emptyFor(name) : mirrored);
-    }
+    if (!store.has(name)) store.set(name, emptyFor(name));
     return store.get(name);
   }
 
-  /* Flat list of records, whatever shape the collection is stored in. */
-  function all(name) {
-    var raw = read(name);
+  function read(name) {
+    return copy(live(name));
+  }
+
+  function objectish(value) {
+    return Boolean(value) && typeof value === "object";
+  }
+
+  /*
+    Every row, with the group it is stored under, flattened without copying. Internal.
+
+    The group is carried alongside rather than derived from the row, because for eighteen of the
+    thirty-six collections the group IS the storage structure - an object keyed by project code -
+    and a row whose own projectCode disagrees with the key it is filed under must still be
+    written back where it was found.
+  */
+  function pairs(name) {
     var found = entry(name);
+    var raw = live(name);
     if (!raw || !found) return [];
     var shape = found.definition.shape;
 
-    if (shape === "singleton") return raw && typeof raw === "object" && Object.keys(raw).length ? [raw] : [];
-    if (Array.isArray(raw)) return raw.filter(function (row) {
-      return row && typeof row === "object";
-    });
+    if (shape === "singleton") {
+      return objectish(raw) && Object.keys(raw).length ? [{ row: raw, group: null }] : [];
+    }
+
+    if (Array.isArray(raw)) {
+      return raw.filter(objectish).map(function (row) {
+        return { row: row, group: null };
+      });
+    }
 
     var out = [];
     Object.keys(raw).forEach(function (group) {
-      var rows = raw[group];
-      if (!Array.isArray(rows)) return;
-      rows.forEach(function (row) {
-        if (row && typeof row === "object") out.push(row);
+      var group_rows = raw[group];
+      if (!Array.isArray(group_rows)) return;
+      group_rows.forEach(function (row) {
+        if (objectish(row)) out.push({ row: row, group: group });
       });
     });
     return out;
+  }
+
+  /*
+    A row that does not name its own project takes it from the key it is filed under.
+
+    Three modules each wrote their own version of this - ppm-financial-utils flatten(),
+    ppm-register-utils flattenStore() and ppm-notifications - because legacy rows exist that
+    carry no project field and would otherwise be invisible to every "for this project" filter,
+    despite being stored under that project. Written once here, the three copies go.
+
+    Groups beginning "programme:" or "__" are markers rather than project codes, and filling a
+    project code from one would invent a project that does not exist. ppm-notifications learnt
+    that the hard way and its exclusion is kept.
+  */
+  var PROGRAMME_GROUP = /^programme:/i;
+  var NOT_AN_OWNER = /^__/;
+
+  function filled(row, field, value) {
+    if (row[field]) return row;
+    var out = {};
+    Object.keys(row).forEach(function (key) {
+      out[key] = row[key];
+    });
+    out[field] = value;
+    return out;
+  }
+
+  function withGroupKey(name, pair) {
+    var group = pair.group;
+    if (group === null || group === undefined || group === "") return pair.row;
+    /* "__UNSCOPED__" and its kind are placeholders for "no owner", not an owner. */
+    if (NOT_AN_OWNER.test(group)) return pair.row;
+
+    /*
+      What the key means comes from the adapter's own registry, not from the shape of the string.
+
+      Two collections - programme milestones and programme RAID - are keyed by a bare programme
+      id, and the registry says so with scopeKind "programme". Guessing from the key would have
+      filled projectCode with a programme id and invented a project that does not exist, which is
+      worse than not filling it at all, because every "for this project" filter would then quietly
+      believe it.
+
+      Benefits are the other case: a benefit owned by a programme rather than a project is filed
+      under "programme:<id>", a convention ppm-register-utils.js introduced, in a collection whose
+      other rows are project-keyed. There the prefix genuinely is the answer.
+    */
+    var found = entry(name);
+    var definition = found ? found.definition : {};
+    if (definition.scopeKind === "programme") return filled(pair.row, "programmeId", group);
+    if (PROGRAMME_GROUP.test(group)) return filled(pair.row, "programmeId", group.slice("programme:".length));
+    return filled(pair.row, definition.projectField || "projectCode", group);
+  }
+
+  function rows(name) {
+    return pairs(name).map(function (pair) {
+      return withGroupKey(name, pair);
+    });
+  }
+
+  /* Flat list of records. Copied, because all of it is being handed out. */
+  function all(name) {
+    return copy(rows(name));
   }
 
   function idFieldOf(name) {
@@ -217,15 +346,20 @@
     return found.definition.idField || found.definition.businessKey || "";
   }
 
+  /*
+    byId and forProject search the live rows and copy only what they return, rather than copying
+    the collection and then discarding most of it. Same guarantee, and it keeps a lookup inside a
+    loop - which is how a page renders a list of projects with their owners - from copying every
+    record once per iteration.
+  */
   function byId(name, id) {
     var field = idFieldOf(name);
     if (!field) return null;
     var wanted = String(id || "");
-    return (
-      all(name).find(function (row) {
-        return String(row[field] || "") === wanted;
-      }) || null
-    );
+    var found = rows(name).find(function (row) {
+      return String(row[field] || "") === wanted;
+    });
+    return found ? copy(found) : null;
   }
 
   function forProject(name, projectCode) {
@@ -233,9 +367,11 @@
     if (!found) return [];
     var field = found.definition.projectField || "projectCode";
     var wanted = String(projectCode || "");
-    return all(name).filter(function (row) {
-      return String(row[field] || row.projectCode || "") === wanted;
-    });
+    return copy(
+      rows(name).filter(function (row) {
+        return String(row[field] || row.projectCode || "") === wanted;
+      })
+    );
   }
 
   function get(name) {
@@ -457,6 +593,80 @@
     }
   }
 
+  /*
+    A collection-shaped argument, resolved into rows and the group each row belongs to.
+
+    THE DEFECT THIS EXISTS TO FIX, WHICH SHIPPED
+
+    replaceAll used to open with one line:
+
+        var incoming = Array.isArray(records) ? records.filter(Boolean) : [];
+
+    Eighteen of the thirty-six collections are stored as an object keyed by project code, and
+    every migrated caller passes exactly that object - saveMilestones() builds the whole store
+    with one project's rows replaced and hands the lot over, which is the signature replaceAll
+    exists to keep. An object is not an array, so `incoming` was empty; an empty incoming means
+    every record already held has "disappeared"; so the removal pass soft-deleted the entire
+    collection, and the call returned ok.
+
+    Saving one milestone would have removed every milestone in the portfolio. Duplicating a
+    project would have removed every plan task in it. Nothing caught this: section 29 of the
+    harness exercises replaceAll thoroughly and only ever against resourceScenarios, which is
+    one of the array-shaped ones.
+
+    The rule that replaces it: a shape this function does not recognise is an error, never an
+    empty collection. "There is nothing here" and "I did not understand you" must not produce
+    the same behaviour when one of them deletes everything.
+  */
+  function incoming(name, records) {
+    var found = entry(name);
+    var shape = found.definition.shape;
+
+    if (Array.isArray(records)) {
+      /* A flat list is accepted for either shape. Grouped collections then fall back to the
+         row's own project field, which is how single-record save() has always grouped. */
+      return {
+        rows: records.filter(objectish).map(function (row) {
+          return { row: row, group: null };
+        })
+      };
+    }
+
+    if (objectish(records)) {
+      if (shape !== "object") {
+        return {
+          error:
+            name +
+            " is stored as a list, so it cannot be replaced with an object keyed by project. Pass an array of records."
+        };
+      }
+      var out = [];
+      Object.keys(records).forEach(function (group) {
+        var group_rows = records[group];
+        if (!Array.isArray(group_rows)) {
+          /* Skipped rather than treated as empty, and said out loud. Treating it as empty is
+             what deleted collections; failing the whole save would make one malformed legacy
+             group block every later edit. */
+          console.warn(
+            'PPMStore: group "' + group + '" of ' + name + " is not a list of records and has been left alone."
+          );
+          return;
+        }
+        group_rows.forEach(function (row) {
+          if (objectish(row)) out.push({ row: row, group: group });
+        });
+      });
+      return { rows: out };
+    }
+
+    return {
+      error:
+        "There is nothing to save for " +
+        name +
+        ". replaceAll needs the whole collection, either as a list of records or as an object keyed by project."
+    };
+  }
+
   async function replaceAll(name, records, options) {
     var found = entry(name);
     if (!found) return invalid('"' + name + '" is not a collection in this application.');
@@ -465,32 +675,50 @@
       return save(name, records || {}, options);
     }
 
-    var incoming = Array.isArray(records) ? records.filter(Boolean) : [];
+    var resolved = incoming(name, records);
+    if (resolved.error) return invalid(resolved.error);
+    var wanted = resolved.rows;
+
     var field = idFieldOf(name);
     if (!field) return invalid('"' + name + '" has no identifier field, so a collection cannot be diffed.');
 
-    var before = all(name);
+    /* Groups carried through from the store, so a removed row is dropped from the group it was
+       actually filed under rather than one guessed from its own fields. */
+    var before = pairs(name).map(function (pair) {
+      return { row: copy(pair.row), group: pair.group };
+    });
     var beforeById = new Map(
-      before.map(function (row) {
-        return [String(row[field] || ""), row];
+      before.map(function (pair) {
+        return [String(pair.row[field] || ""), pair.row];
       })
     );
     var incomingIds = new Set(
-      incoming.map(function (row) {
-        return String(row[field] || "");
+      wanted.map(function (pair) {
+        return String(pair.row[field] || "");
       })
     );
 
+    /* The group the caller filed this row under wins over anything derivable from the row. */
+    var withGroup = function (group) {
+      if (group === null || group === undefined || group === "") return options;
+      var merged = {};
+      Object.keys(options || {}).forEach(function (key) {
+        merged[key] = options[key];
+      });
+      merged.storageGroup = group;
+      return merged;
+    };
+
     var outcome = { ok: true, saved: 0, removed: 0, unchanged: 0, problems: [] };
 
-    for (var i = 0; i < incoming.length; i += 1) {
-      var row = incoming[i];
+    for (var i = 0; i < wanted.length; i += 1) {
+      var row = wanted[i].row;
       var prior = beforeById.get(String(row[field] || ""));
       if (prior && sameRecord(prior, row)) {
         outcome.unchanged += 1;
         continue;
       }
-      var saveResult = await save(name, row, options);
+      var saveResult = await save(name, row, withGroup(wanted[i].group));
       if (saveResult.ok) outcome.saved += 1;
       else {
         outcome.ok = false;
@@ -499,9 +727,9 @@
     }
 
     for (var j = 0; j < before.length; j += 1) {
-      var gone = before[j];
+      var gone = before[j].row;
       if (incomingIds.has(String(gone[field] || ""))) continue;
-      var removeResult = await remove(name, gone, options);
+      var removeResult = await remove(name, gone, withGroup(before[j].group));
       if (removeResult.ok) outcome.removed += 1;
       else {
         outcome.ok = false;
@@ -574,10 +802,14 @@
     if (!found) return;
     var shape = found.definition.shape;
     var field = idFieldOf(name);
-    var raw = read(name);
+    var raw = live(name);
+    /* The caller keeps its own object and may well edit it again - a form that saves on every
+       keystroke does exactly that. What the store keeps is the state the database confirmed, so
+       it cannot be the same object. */
+    var kept = copy(record);
 
     if (shape === "singleton") {
-      store.set(name, record);
+      store.set(name, kept);
       return;
     }
 
@@ -592,15 +824,15 @@
     var at = rows.findIndex(function (row) {
       return String(row[field] || "") === String(record[field] || "");
     });
-    if (at === -1) rows.push(record);
-    else rows[at] = record;
+    if (at === -1) rows.push(kept);
+    else rows[at] = kept;
   }
 
   function removeFromStore(name, record, options) {
     var found = entry(name);
     if (!found) return;
     var field = idFieldOf(name);
-    var raw = read(name);
+    var raw = live(name);
     var wanted = String(record[field] || "");
 
     if (found.definition.shape === "singleton") {
@@ -702,6 +934,10 @@
       return [...start().keys()].sort();
     },
     collectionFor: collectionFor,
+    /* Hydration's way in, and the adapters' only reason to touch this module. Not for page code:
+       it sets a collection without asking the database anything, which is exactly what every
+       other function here exists to prevent. */
+    adopt: adopt,
     read: read,
     all: all,
     byId: byId,
