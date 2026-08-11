@@ -2866,7 +2866,7 @@ function pdfMeta() {
   const user = typeof PPMAuth !== "undefined" ? PPMAuth.getCurrentUser() : null;
   return {
     generatedBy: user ? user.fullName || user.email : "",
-    preparedFor: "Foresters Portfolio",
+    preparedFor: "Portfolio Manager",
     classification: "Internal",
     period: reportingPeriods.find((period) => period.status === "Open")?.name || "Current position",
     filters: appliedFilterLabels()

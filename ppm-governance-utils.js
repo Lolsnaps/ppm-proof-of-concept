@@ -26,7 +26,7 @@
       programmeId: programmeIdForIndex(index),
       name,
       description: `${name} change portfolio and delivery workstream.`,
-      portfolio: "Foresters Portfolio",
+      portfolio: "Portfolio Manager",
       sponsor: "",
       sponsorResourceId: "",
       sponsorEmail: "",

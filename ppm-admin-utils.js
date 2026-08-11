@@ -218,8 +218,8 @@
     const timestamp = nowIso();
     return {
       portfolioId: "PORT-00001",
-      name: "Foresters Portfolio",
-      description: "Foresters Financial UK change portfolio.",
+      name: "Portfolio Manager",
+      description: "the change portfolio.",
       owner: "",
       ownerResourceId: "",
       ownerEmail: "",
@@ -528,7 +528,7 @@
     return {
       templateId: "LIFE-00001",
       name: "Standard project lifecycle",
-      description: "Default Foresters lifecycle from intake through closure.",
+      description: "Default standard lifecycle from intake through closure.",
       applicableProjectTypes: ["*"],
       stages: defaultStages(),
       active: true,
@@ -1301,7 +1301,7 @@
     return {
       calendarId: "CAL-00001",
       name: "Monthly portfolio reporting",
-      description: "Default monthly reporting calendar for Foresters Portfolio.",
+      description: "Default monthly reporting calendar for Portfolio Manager.",
       portfolioId: "PORT-00001",
       frequency: "Monthly",
       dueOffsetDays: 5,

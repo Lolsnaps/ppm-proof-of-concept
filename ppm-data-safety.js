@@ -324,7 +324,7 @@
 
     return {
       format: BACKUP_FORMAT,
-      application: "Foresters Portfolio",
+      application: "Portfolio Manager",
       createdAt: new Date().toISOString(),
       createdBy: currentActorName(),
       keyCount: Object.keys(data).length,
@@ -383,7 +383,7 @@
 
   function backupFileName() {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
-    return `foresters-portfolio-backup-${stamp}.json`;
+    return `portfolio-manager-backup-${stamp}.json`;
   }
 
   function exportAll() {
@@ -402,10 +402,10 @@
   function inspectBackup(parsed) {
     const problems = [];
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { valid: false, problems: ["The file is not a Foresters Portfolio backup."], backup: null };
+      return { valid: false, problems: ["The file is not a Portfolio Manager backup."], backup: null };
     }
-    if (parsed.application !== "Foresters Portfolio") {
-      problems.push("The file does not identify itself as a Foresters Portfolio backup.");
+    if (parsed.application !== "Portfolio Manager") {
+      problems.push("The file does not identify itself as a Portfolio Manager backup.");
     }
     if (!READABLE_FORMATS.has(Number(parsed.format))) {
       problems.push(
@@ -646,7 +646,7 @@
 
     const archive = {
       format: BACKUP_FORMAT,
-      application: "Foresters Portfolio",
+      application: "Portfolio Manager",
       archiveOf: AUDIT_KEY,
       createdAt: new Date().toISOString(),
       createdBy: currentActorName(),
@@ -657,7 +657,7 @@
     };
 
     const stamp = new Date().toISOString().slice(0, 10);
-    download(JSON.stringify(archive, null, 2), `foresters-portfolio-audit-archive-${stamp}.json`);
+    download(JSON.stringify(archive, null, 2), `portfolio-manager-audit-archive-${stamp}.json`);
 
     nativeSetItem.call(localStorage, AUDIT_KEY, JSON.stringify(toKeep));
 
@@ -695,7 +695,7 @@
 
     const archive = {
       format: BACKUP_FORMAT,
-      application: "Foresters Portfolio",
+      application: "Portfolio Manager",
       archiveOf: AUDIT_KEY,
       createdAt: new Date().toISOString(),
       createdBy: currentActorName(),
@@ -711,7 +711,7 @@
 
     const stamp = new Date().toISOString().slice(0, 10);
     try {
-      download(JSON.stringify(archive, null, 2), `foresters-portfolio-unverified-audit-${stamp}.json`);
+      download(JSON.stringify(archive, null, 2), `portfolio-manager-unverified-audit-${stamp}.json`);
     } catch (error) {
       return {
         archived: 0,

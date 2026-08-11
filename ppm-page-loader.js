@@ -1,5 +1,5 @@
 /*
-  Foresters Portfolio — page bootstrap and loading state
+  Portfolio Manager — page bootstrap and loading state
 
   Database-backed collections are asynchronous, while the existing page scripts remain
   synchronous by design. This loader waits for both hydration layers, then loads the page

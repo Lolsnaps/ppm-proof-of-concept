@@ -13,7 +13,7 @@
       PPMReportPdf.download({
         title: "Portfolio status report",
         subtitle: "All active projects",
-        meta: { filters: ["Portfolio: Foresters"], generatedBy: "A. Taylor" },
+        meta: { filters: ["Portfolio: Group change portfolio"], generatedBy: "A. Taylor" },
         kpis: [{ label: "Projects", value: 24 }, { label: "Red", value: 3, tone: "red" }],
         charts: [{ title: "Overall RAG", type: "bar", data: [{ label: "Green", value: 12, tone: "green" }] }],
         sections: [{ heading: "Project register", table: { columns, rows } }]
@@ -30,7 +30,7 @@
     muted: "#64748b",
     line: "#dbe3ef",
     zebra: "#fbfcfe",
-    organisation: "Foresters Portfolio"
+    organisation: "Portfolio Manager"
   };
 
   // Text and fill colours for RAG-style values, used in KPI boxes, chart bars

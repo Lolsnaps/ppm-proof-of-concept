@@ -143,8 +143,8 @@ async function prepareMfa() {
   Stage 13A: first-run authenticator enrolment.
 
   This is what the application was missing entirely. Previously a new account
-  reached prepareMfa(), found no factor and threw "Enrol MFA before using Foresters
-  Portfolio" — with nowhere to do so. Nobody but the first administrator could get
+  reached prepareMfa(), found no factor and threw "Enrol MFA before using Portfolio
+  Manager" — with nowhere to do so. Nobody but the first administrator could get
   in.
 
   Enrolment is permitted at AAL1, which is the only level Supabase allows it at, and
@@ -165,7 +165,7 @@ async function prepareEnrolment() {
 
   const { data, error } = await PPMSupabase.auth.mfa.enroll({
     factorType: "totp",
-    friendlyName: `Foresters Portfolio ${new Date().toISOString().slice(0, 10)}`
+    friendlyName: `Portfolio Manager ${new Date().toISOString().slice(0, 10)}`
   });
   if (error) throw new Error(`The authenticator could not be set up: ${error.message}`);
 
@@ -287,7 +287,7 @@ async function confirmEnrolment(event) {
     });
     if (error)
       throw new Error(
-        "That code was not accepted. Check the app is showing a code for Foresters Portfolio, wait for a fresh one and try again."
+        "That code was not accepted. Check the app is showing a code for Portfolio Manager, wait for a fresh one and try again."
       );
     await afterAal2();
   } catch (error) {

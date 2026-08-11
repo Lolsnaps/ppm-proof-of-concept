@@ -1,5 +1,5 @@
 /*
-  Foresters Portfolio — Stage 11E
+  Portfolio Manager — Stage 11E
   Child collection adapter plus transactional stage-gate, baseline, financial and resource-scenario workflow cutovers, and append-only recorded status history
 
   NON-DISRUPTIVE BY DESIGN:

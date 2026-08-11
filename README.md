@@ -1,4 +1,4 @@
-# Foresters Portfolio
+# Portfolio Manager
 
 An internal portfolio and project management tool, running as a private pilot.
 
