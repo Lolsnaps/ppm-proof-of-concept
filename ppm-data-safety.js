@@ -29,9 +29,11 @@
      report offered instead. Genuinely local keys still restore directly.
 
   Storage pressure is also much less of a concern than it was: the collections that
-  used to fill the quota are in PostgreSQL now, and localStorage holds a mirror that
-  hydration rebuilds. The quota guard stays because a full store still breaks
-  saving, and a silent failure is still the worst outcome.
+  used to fill the quota are in PostgreSQL now, and Stage 17 deleted the localStorage
+  mirror entirely - hydration fills PPMStore in memory instead, so portfolio data no
+  longer touches localStorage at all. What is left is preferences, saved views and
+  historical local audit events. The quota guard stays because a full store still
+  breaks saving, and a silent failure is still the worst outcome.
 
   This module therefore provides:
     - exportAll()                  a point-in-time snapshot file
