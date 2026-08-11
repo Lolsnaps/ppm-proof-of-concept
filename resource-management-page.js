@@ -562,7 +562,7 @@ function absenceBand(absence) {
   const right = positionForDate(addDays(absence.endDateValue, 1));
   const width = Math.max(12, right - left);
   const label = `Unavailable: ${absenceReason(absence)}`;
-  return `<div class="absence-band"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(label)}">${escapeHtml(label)}</div>`;
+  return `<div class="absence-band"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(label)}"><span class="bar-label">${escapeHtml(label)}</span></div>`;
 }
 
 function absenceConflictSegment(assignment, absence) {
@@ -659,7 +659,7 @@ function overAllocationBar(run) {
   const { left, width } = spanGeometry(run.start, run.finish);
   const days = workingDaysBetween(run.start, run.finish);
   const label = `${run.percent}% allocated · ${days} work day${days === 1 ? "" : "s"} · ${run.start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} to ${run.finish.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
-  return `<div class="overallocation-bar"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(label)}">${run.percent}%</div>`;
+  return `<div class="overallocation-bar"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(label)}"><span class="bar-label">${run.percent}%</span></div>`;
 }
 
 /*
@@ -672,7 +672,7 @@ function availabilityBar(run) {
   const { left, width } = spanGeometry(run.start, run.finish);
   const label = `Available: ${run.perDay}h/d for ${run.days} work day${run.days === 1 ? "" : "s"}`;
   const range = `${run.start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} to ${run.finish.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
-  return `<div class="availability-bar"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(`${label} · ${range}`)}"><b>Available:</b> ${escapeHtml(`${run.perDay}h/d for ${run.days} work day${run.days === 1 ? "" : "s"}`)}</div>`;
+  return `<div class="availability-bar"${styleAttr(`left:${left}px;width:${width}px`)} title="${escapeHtml(`${label} · ${range}`)}"><span class="bar-label"><b>Available:</b> ${escapeHtml(`${run.perDay}h/d for ${run.days} work day${run.days === 1 ? "" : "s"}`)}</span></div>`;
 }
 
 /*
@@ -724,7 +724,7 @@ function taskLine(assignment, absenceRows) {
       ` data-edit-task="${escapeHtml(assignment.taskId)}"` +
       ` data-edit-allocation="${escapeHtml(String(assignment.allocation))}"` +
       `${conflicts.length ? ` data-card-conflict="${escapeHtml(conflicts.map(absenceReason).join("; "))}"` : ""}` +
-      `><span class="task-bar-label">${escapeHtml(label)}</span></div>`;
+      `><span class="task-bar-label bar-label">${escapeHtml(label)}</span></div>`;
   } else {
     /*
       An assignment with an owner and no dates. It cannot be drawn anywhere on a timeline, and
@@ -1056,6 +1056,132 @@ function bindDragScroll() {
   scroller.addEventListener("pointerleave", release);
 }
 
+/* ===========================================================================
+   LABELS THAT STAY WITH THE PART OF THE BAR YOU CAN SEE
+
+   A bar is positioned by its dates, and its label sits at its start. Scroll to the second half
+   of a three-month task and the label has gone with the first half: what is left on screen is a
+   long plum rectangle with nothing on it, and the only way to find out what it is was to scroll
+   back to where it began.
+
+   So the label is moved along the bar as the timeline scrolls, and sits at whichever end of the
+   bar the viewport is currently showing. Scroll past the start and the text follows you; scroll
+   back and it settles at the start again.
+
+   THE ARITHMETIC IS SEPARATED FROM THE DOM DELIBERATELY
+
+   labelWindow() is pure and is where the reasoning lives - it can be proved in the harness,
+   which cannot run the page. Everything below it is plumbing: read geometry once per render,
+   apply on scroll.
+   =========================================================================== */
+
+/* The bar's own left and right padding, which the label sits inside. Subtracted from the width
+   the label is given so a truncated label ellipses inside the bar rather than against its edge. */
+const BAR_LABEL_PADDING = 18;
+
+/*
+  Below this there is no room for a readable fragment, so the label is left where it is rather
+  than being shuffled into a two-pixel sliver. The bar's title attribute still answers.
+*/
+const MINIMUM_LABEL_WIDTH = 32;
+
+/*
+  Where a bar's label should sit, and how much room it has, given how far the timeline has
+  scrolled.
+
+  All four values are in the timeline's own coordinates - the same space spanGeometry() writes
+  bars in - so the caller does not need to know anything about the scroller. Returns the offset
+  ALONG THE BAR, so 0 means "at its start", which is what an unscrolled or fully visible bar
+  wants and is therefore the safe default when anything is unknown.
+*/
+function labelWindow(barLeft, barWidth, viewLeft, viewWidth) {
+  const start = Math.max(barLeft, viewLeft);
+  const end = Math.min(barLeft + barWidth, viewLeft + viewWidth);
+  /* Entirely off screen, in either direction. Left where it is: moving a label nobody can see
+     costs a style write and changes nothing. */
+  if (end <= start) return { visible: false, offset: 0, width: barWidth };
+  return { visible: true, offset: start - barLeft, width: end - start };
+}
+
+/*
+  Every labelled bar in the chart, with its geometry read once.
+
+  Read here rather than on each scroll because it cannot change without a re-render: the bars are
+  rebuilt from scratch whenever the zoom, the filters or the data move. Reading offsetLeft in a
+  loop forces one layout, and doing it sixty times a second while somebody drags the chart would
+  be the whole cost of this feature.
+*/
+function collectBarLabels(scroller) {
+  return [...scroller.querySelectorAll(".task-bar, .overallocation-bar, .availability-bar, .absence-band")]
+    .map((bar) => {
+      const label = bar.querySelector(".bar-label");
+      if (!label) return null;
+      return { label, left: bar.offsetLeft, width: bar.offsetWidth, applied: null };
+    })
+    .filter(Boolean);
+}
+
+let barLabels = [];
+let labelFrame = 0;
+
+/*
+  Moves each label to the visible part of its bar.
+
+  Only writes where the answer has changed. At any moment the bars that are crossing the left
+  edge number a handful; everything else is either fully visible or fully off screen and its
+  answer is the same as it was last frame. That is what keeps this cheap on a chart with several
+  hundred bars.
+*/
+function positionBarLabels(scroller) {
+  if (!barLabels.length) return;
+  const viewLeft = scroller.scrollLeft;
+  const viewWidth = Math.max(0, scroller.clientWidth - detailWidth());
+
+  barLabels.forEach((entry) => {
+    const window_ = labelWindow(entry.left, entry.width, viewLeft, viewWidth);
+    const room = window_.width - BAR_LABEL_PADDING;
+    /* A sliver of bar is not worth relabelling: the text would be an ellipsis on its own. */
+    const offset = window_.visible && room >= MINIMUM_LABEL_WIDTH ? window_.offset : 0;
+    if (entry.applied === offset) return;
+    entry.applied = offset;
+    /* transform rather than margin or left: it is the one property here that moves something
+       without asking the browser to lay the row out again. The label carries no z-index and
+       nothing is positioned against it, so the stacking context it creates is inert. */
+    entry.label.style.setProperty("transform", offset ? `translateX(${Math.round(offset)}px)` : "none");
+    entry.label.style.setProperty("max-width", offset ? `${Math.round(room)}px` : "");
+  });
+}
+
+/*
+  Re-read the geometry and reposition. Called after every render, and on resize, because both
+  change the answer: a render moves the bars, a resize moves the viewport's right edge.
+*/
+function refreshBarLabels() {
+  const scroller = document.querySelector(".gantt-scroll");
+  if (!scroller) return;
+  barLabels = collectBarLabels(scroller);
+  positionBarLabels(scroller);
+}
+
+function bindLabelTracking() {
+  const scroller = document.querySelector(".gantt-scroll");
+  if (!scroller || scroller.dataset.labelBound === "true") return;
+  scroller.dataset.labelBound = "true";
+
+  /* Coalesced to one write per painted frame. A scroll event can fire many times between two
+     frames, and every one of them would otherwise walk the whole list to reach the same answer. */
+  const schedule = () => {
+    if (labelFrame) return;
+    labelFrame = requestAnimationFrame(() => {
+      labelFrame = 0;
+      positionBarLabels(scroller);
+    });
+  };
+
+  scroller.addEventListener("scroll", schedule, { passive: true });
+  window.addEventListener("resize", refreshBarLabels);
+}
+
 function renderGantt() {
   const resourceList = selectedResources();
   const ids = new Set(resourceList.map((resource) => resource.resourceId));
@@ -1088,6 +1214,9 @@ function renderGantt() {
   PPMCore.applyComputedStyles(ganttContent);
   bindAssignmentCard();
   bindDragScroll();
+  bindLabelTracking();
+  /* After the bars exist and their widths are settled, so offsetLeft answers truthfully. */
+  refreshBarLabels();
   hideAssignmentCard();
   document.getElementById("timelineRange").textContent =
     `${range.minimum.toLocaleDateString("en-GB", { month: "short", year: "numeric" })} to ${range.maximum.toLocaleDateString("en-GB", { month: "short", year: "numeric" })} · ${ZOOM_CONFIG[zoom].label} zoom`;

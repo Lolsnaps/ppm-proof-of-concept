@@ -709,6 +709,23 @@ main {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Every label that travels with the visible part of its bar.
+
+   A bar is placed by its dates and its label sat at its start, so scrolling to the second half of
+   a long task left a rectangle with nothing written on it. The script moves the label along the
+   bar as the chart scrolls; these two properties are what let it do that without the text
+   spilling past the end of the bar it belongs to.
+
+   will-change is deliberately NOT set. It would promote every bar in the chart to its own layer
+   for a transform that changes on a handful of them at a time, and layer count is the thing that
+   makes a long timeline scroll badly in the first place. */
+.bar-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .task-bar:focus-visible {
   outline: 3px solid rgba(157, 220, 249, 0.75);
   outline-offset: 1px;
