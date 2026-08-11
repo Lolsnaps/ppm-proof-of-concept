@@ -14,10 +14,33 @@ header.ppm-auth-header {
   padding-right: clamp(260px, 25vw, 390px) !important;
 }
 
+/*
+  The signed-in identity, the notification bell and Sign out.
+
+  THE Z-INDEX HERE IS LOAD BEARING, AND THE TRANSFORM IS WHY
+
+  `transform` creates a stacking context. Everything inside this bar - including the notification
+  panel, which asks for z-index 5000 - is therefore stacked WITHIN this element rather than
+  against the page. The 5000 only ever decided the panel's order relative to the bell beside it.
+
+  So the panel appeared underneath the stage-gate register: sticky table headers and cells at
+  z-index 2 to 6 painted over it, because the whole bar was competing at its own position in the
+  document with no z-index at all.
+
+  1400 sits above every page-level layer (the highest is 1200, the resource-management modal
+  backdrop) and below the two application-wide overlays that must cover everything: the
+  permission toast at 4000 and the storage-full warning at 2000. A modal on a page will therefore
+  sit under this bar - which is the right way round, because the bell has to stay reachable, and
+  the panel closes on an outside click.
+
+  If a page ever needs a layer above 1400, raise this rather than that. VERIFY-STATIC.mjs section
+  6g checks the ordering holds.
+*/
 .ppm-session-bar {
   position: absolute;
   top: 50%;
   right: var(--page-gutter, var(--gutter, clamp(22px, 2.6vw, 56px)));
+  z-index: 1400;
   display: flex;
   align-items: center;
   gap: 11px;
